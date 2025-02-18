@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { db, account, Query } from "../../../lib/appwrite"; // ✅ Import properly
+import { db, account, ID, Query, storage } from "../../../lib/appwrite";
 import { motion } from "framer-motion";
-import { FaPlusCircle, FaSpinner } from "react-icons/fa";
+import { FaPlusCircle, FaSpinner, FaTrash, FaEdit, FaMoneyBillWave, FaFileAlt, FaHome, FaImages } from "react-icons/fa";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -12,57 +12,40 @@ export default function Dashboard() {
   const [user, setUser] = useState(null);
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [redirecting, setRedirecting] = useState(false); // ✅ Prevents infinite redirect loop
+  const [redirecting, setRedirecting] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [imageFiles, setImageFiles] = useState([]);
+  const [editingId, setEditingId] = useState(null);
+  const [form, setForm] = useState({ title: "", description: "", price: "" });
   const router = useRouter();
+  const bucketId = "67b2fe15002b214adfba"; // ✅ Replace with your Appwrite Storage Bucket ID
 
   useEffect(() => {
     async function fetchUserData() {
       try {
         console.log("🔄 Fetching Appwrite session...");
-
-        // ✅ Step 1: Get the current session
         const session = await account.get();
-        console.log("🟢 Session Data:", session);
+        if (!session) return;
 
-        if (!session) {
-          console.warn("⚠ No session found. Redirecting to login...");
-          return;
-        }
-
-        // ✅ Step 2: Fetch user data from database using IP
         const ipResponse = await fetch("https://api64.ipify.org?format=json");
         const ipData = await ipResponse.json();
         const userIP = ipData.ip;
-        console.log("🌐 User IP:", userIP);
 
-        // ✅ Step 3: Find user by IP in the database
         const userResponse = await db.listDocuments("67a8e81100361d527692", "67a900dc003e3b7524ee", [
           Query.equal("ip", userIP),
         ]);
 
-        console.log("🟡 Raw User Response:", userResponse);
-
         if (userResponse.documents.length === 0) {
-          console.warn("⚠ No user found with matching IP. Redirecting...");
+          setRedirecting(true);
           return;
         }
 
-        // ✅ Step 4: Store user data
         const userData = userResponse.documents[0];
-        console.log("✅ Final User Data:", userData);
+        setUser({ ...userData, avatar: `https://crafthead.net/avatar/${userData.uuid}` });
 
-        setUser({
-          ...userData,
-          avatar: `https://crafthead.net/avatar/${userData.uuid}`,
-        });
-
-        // ✅ Step 5: Fetch user's listings
-        console.log("🔍 Fetching user's listings for UUID:", userData.uuid);
         const listingsResponse = await db.listDocuments("67a8e81100361d527692", "67b2fdc20027f4d55440", [
           Query.equal("sellerUUID", userData.uuid),
         ]);
-
-        console.log("🟢 Listings Data:", listingsResponse);
         setListings(listingsResponse.documents);
       } catch (error) {
         console.error("🚨 Error fetching user data:", error);
@@ -74,46 +57,132 @@ export default function Dashboard() {
     fetchUserData();
   }, []);
 
-  // ✅ Prevents infinite redirect loop
   useEffect(() => {
     if (redirecting) {
       router.push("/login");
     }
   }, [redirecting, router]);
 
+  // ✅ Upload images and return their public URLs
+  async function uploadImages(documentId) {
+    const uploadedImageUrls = [];
+  
+    for (let file of imageFiles) {
+      try {
+        const fileId = ID.unique(); // ✅ Unique & valid file ID
+        const response = await storage.createFile(bucketId, fileId, file);
+  
+        const fileUrl = storage.getFileView(bucketId, response.$id);
+        uploadedImageUrls.push(fileUrl);
+      } catch (error) {
+        console.error("🚨 Error uploading image:", error);
+      }
+    }
+  
+    return uploadedImageUrls;
+  }
+  
+  // ✅ Create or Update Listing
+  async function handleListing() {
+    if (!user || !user.uuid) {
+      alert("⚠ User not found!");
+      return;
+    }
+  
+    if (!form.title || !form.description || !form.price) {
+      alert("⚠ Please fill in all fields!");
+      return;
+    }
+  
+    setSubmitting(true);
+    const documentId = editingId || ID.unique();
+  
+    try {
+      const uploadedImages = await uploadImages(documentId); // ✅ Upload images first
+  
+      const listingData = {
+        sellerUUID: user.uuid,
+        title: form.title,
+        description: form.description,
+        price: parseFloat(form.price), // ✅ Convert price to float
+        imageUrls: uploadedImages, // ✅ Store as array
+      };
+  
+      if (isNaN(listingData.price)) {
+        alert("⚠ Price must be a valid number!");
+        setSubmitting(false);
+        return;
+      }
+  
+      if (editingId) {
+        await db.updateDocument("67a8e81100361d527692", "67b2fdc20027f4d55440", editingId, listingData);
+        alert("✅ Listing updated successfully!");
+      } else {
+        await db.createDocument("67a8e81100361d527692", "67b2fdc20027f4d55440", documentId, listingData);
+        alert("✅ Listing created successfully!");
+      }
+  
+      setEditingId(null);
+      setImageFiles([]);
+      setForm({ title: "", description: "", price: "" });
+  
+      const response = await db.listDocuments("67a8e81100361d527692", "67b2fdc20027f4d55440", [
+        Query.equal("sellerUUID", user.uuid),
+      ]);
+      setListings(response.documents);
+    } catch (error) {
+      console.error("🚨 Error handling listing:", error);
+      alert("❌ Failed to process listing. Try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+  
+  // ✅ Delete Listing
+  async function deleteListing(id) {
+    if (!confirm("Are you sure you want to delete this listing?")) return;
+
+    try {
+      await db.deleteDocument("67a8e81100361d527692", "67b2fdc20027f4d55440", id);
+      setListings((prev) => prev.filter((listing) => listing.$id !== id));
+      alert("✅ Listing deleted successfully!");
+    } catch (error) {
+      console.error("🚨 Error deleting listing:", error);
+      alert("❌ Failed to delete listing.");
+    }
+  }
+
   if (loading) {
     return <p className="text-center text-white">🔄 Loading session...</p>;
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black text-white flex flex-col items-center p-6">
+    <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center p-6">
       <h2 className="text-4xl font-bold mb-8">Dashboard</h2>
-
       <h3 className="text-2xl">Welcome, {user.username}!</h3>
 
-      {/* 🔹 User Avatar */}
-      <Image src={user.avatar} width={100} height={100} className="rounded-full mt-4" alt="User Avatar" />
+      <Image src={user.avatar} width={100} height={100} className="mt-4 rounded-full" alt="User Avatar" />
 
-      {/* 🔹 Listings */}
+      {/* Listing Form */}
+      <motion.div className="w-full max-w-2xl p-6 bg-gray-800 border border-gray-700 shadow-lg rounded-lg mt-8">
+        <h2 className="text-xl font-semibold mb-4">{editingId ? "Edit Listing" : "Create a Listing"}</h2>
+        <input type="text" placeholder="Title" className="w-full p-3 mb-4 rounded bg-gray-700 text-white" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+        <input type="number" placeholder="Price (€)" className="w-full p-3 mb-4 rounded bg-gray-700 text-white" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
+        <textarea placeholder="Description" className="w-full p-3 mb-4 rounded bg-gray-700 text-white" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+        <input type="file" multiple accept="image/*" onChange={(e) => setImageFiles([...e.target.files])} />
+        <button onClick={handleListing} className="w-full p-3 bg-blue-500 mt-4 rounded">{submitting ? "Processing..." : editingId ? "Update Listing" : "Create Listing"}</button>
+      </motion.div>
+
+      {/* Listings */}
       <h2 className="text-3xl font-bold mt-12">Your Active Listings</h2>
-      <div className="w-full max-w-5xl mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {listings.length > 0 ? (
-          listings.map((listing) => (
-            <motion.div key={listing.$id} whileHover={{ scale: 1.02 }} className="rounded-lg overflow-hidden shadow-lg bg-gray-800 text-white">
-              <Link href={`/listing/${listing.$id}`}>
-                <div>
-                  <Image src={listing.images[0] || "/example.jpg"} width={400} height={300} alt={listing.title} className="w-full h-60 object-cover" />
-                  <div className="p-4">
-                    <h3 className="text-lg font-semibold">{listing.title}</h3>
-                    <p className="text-gray-400">{listing.description.substring(0, 50)}...</p>
-                  </div>
-                </div>
-              </Link>
-            </motion.div>
-          ))
-        ) : (
-          <p className="text-gray-400">You have no active listings.</p>
-        )}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
+        {listings.map((listing) => (
+          <div key={listing.$id} className="bg-gray-800 p-4 rounded">
+            <h3 className="text-lg">{listing.title}</h3>
+            <p>{listing.price}€</p>
+            <button onClick={() => deleteListing(listing.$id)}>❌ Delete</button>
+          </div>
+        ))}
       </div>
     </div>
   );

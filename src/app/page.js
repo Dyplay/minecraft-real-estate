@@ -91,10 +91,10 @@ export default function Home() {
                   <div>
                     {/* Property Image */}
                     <Image
-                      src={listing.images[0] || "/example.jpg"}
+                      src={(listing.images && listing.images.length > 0) ? listing.images[0] : "/example.jpg"}
                       width={400}
                       height={300}
-                      alt={listing.title}
+                      alt={listing.title || "Property Image"}
                       className="w-full h-60 object-cover"
                     />
 

@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getCurrentUser } from "../../../lib/appwrite"; // ✅ Ensure correct import
 import { useRouter } from "next/navigation";
+import { db, account, Query } from "../../../lib/appwrite"; // ✅ Ensure correct import
 import Link from "next/link";
 import Image from "next/image";
 import { FaSearch, FaChevronDown } from "react-icons/fa";
@@ -15,9 +15,61 @@ export default function Navbar() {
 
   useEffect(() => {
     async function fetchUser() {
-      const currentUser = await getCurrentUser();
-      console.log("Fetched User in Navbar:", currentUser); // ✅ Debugging
-      setUser(currentUser);
+      try {
+        console.log("🔄 Fetching Appwrite session...");
+        const session = await account.get();
+        console.log("🟢 Session Data:", session);
+
+        if (!session) {
+          console.warn("⚠ No session found.");
+          return;
+        }
+
+        // ✅ Step 1: Get current **external** IP
+        let ipData;
+        try {
+          const ipResponse = await fetch("https://api64.ipify.org?format=json");
+          ipData = await ipResponse.json();
+        } catch (error) {
+          console.error("🚨 Failed to fetch user IP:", error);
+          return;
+        }
+
+        const userIP = ipData.ip;
+        console.log("🌐 Fetched User IP:", userIP);
+
+        // ✅ Step 2: Find user by **IP Address**
+        const userResponse = await db.listDocuments("67a8e81100361d527692", "67a900dc003e3b7524ee", [
+          Query.equal("ip", userIP),
+        ]);
+
+        if (userResponse.documents.length === 0) {
+          console.warn("⚠ No user found with matching IP.");
+          return;
+        }
+
+        const userData = userResponse.documents[0];
+        console.log("✅ Found User Data:", userData);
+
+        // ✅ Step 3: Fetch Minecraft Username from Mojang API
+        let mcUsername = "Unknown";
+        try {
+          const mcResponse = await fetch(`https://rigabank.dyplay.at/api/uuid?uuid=${userData.uuid}`);
+          const mcData = await mcResponse.json();
+          mcUsername = mcData.name; // Get latest name
+        } catch (error) {
+          console.error("🚨 Failed to fetch Minecraft username:", error);
+        }
+
+        setUser({
+          ...userData,
+          mcUsername: mcUsername,
+          avatar: `https://crafthead.net/avatar/${userData.uuid}`, // ✅ Minecraft PFP
+        });
+
+      } catch (error) {
+        console.error("🚨 Error fetching user session:", error);
+      }
     }
     fetchUser();
   }, []);
@@ -36,9 +88,10 @@ export default function Navbar() {
           placeholder="Search listings..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && router.push(`/listings?search=${encodeURIComponent(search)}`)}
           className="bg-transparent text-white px-3 outline-none w-64 placeholder-gray-400"
         />
-        <button className="p-2 hover:bg-gray-700 rounded-full transition">
+        <button onClick={() => router.push(`/listings?search=${encodeURIComponent(search)}`)} className="p-2 hover:bg-gray-700 rounded-full transition">
           <FaSearch className="text-white" />
         </button>
       </div>
@@ -48,13 +101,12 @@ export default function Navbar() {
         <div className="relative">
           <button onClick={() => setDropdown(!dropdown)} className="flex items-center gap-2 hover:text-gray-400 transition">
             <Image
-              src={user.avatar}
+              src={user.avatar || "/example.jpg"}
               width={32}
               height={32}
-              className="rounded-full"
               alt="User Avatar"
             />
-            <span>{user.name}</span>
+            <span>{user.mcUsername}</span> {/* ✅ Show Minecraft Username */}
             <FaChevronDown />
           </button>
 

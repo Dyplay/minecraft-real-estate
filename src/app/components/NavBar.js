@@ -64,7 +64,7 @@ export default function Navbar() {
         setUser({
           ...userData,
           mcUsername: mcUsername,
-          avatar: `https://crafthead.net/avatar/${userData.uuid}`, // ✅ Minecraft PFP
+          avatar: `https://crafthead.net/helm/${userData.uuid}`, // ✅ Minecraft PFP
         });
 
       } catch (error) {
@@ -105,6 +105,7 @@ export default function Navbar() {
               width={32}
               height={32}
               alt="User Avatar"
+              className="rounded-md"
             />
             <span>{user.mcUsername}</span> {/* ✅ Show Minecraft Username */}
             <FaChevronDown />

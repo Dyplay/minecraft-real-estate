@@ -10,12 +10,14 @@ import { motion, AnimatePresence } from "framer-motion";
 
 export default function Listings() {
   const [listings, setListings] = useState([]);
+  const [sellers, setSellers] = useState({});
   const [filters, setFilters] = useState({
     minPrice: "",
     maxPrice: "",
     type: "",
     country: "",
   });
+
   const [searchQuery, setSearchQuery] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const searchParams = useSearchParams();
@@ -31,40 +33,79 @@ export default function Listings() {
   useEffect(() => {
     async function fetchListings() {
       let filterConditions = [];
-    
+
+      // 🔍 Full-Text Search
       if (searchQuery) {
         filterConditions.push(
-          Query.search("title", searchQuery),
-          Query.search("description", searchQuery),
-          Query.search("seller", searchQuery),
-          Query.search("country", searchQuery)
+          Query.or([
+            Query.contains("title", searchQuery),
+            Query.contains("description", searchQuery),
+            Query.contains("country", searchQuery),
+            Query.contains("type", searchQuery),
+          ])
         );
       }
-    
-      // ✅ Ensure price filters are numbers
+
+      // 💰 Price Filters
       if (filters.minPrice && !isNaN(filters.minPrice)) {
         filterConditions.push(Query.greaterThanEqual("price", Number(filters.minPrice)));
       }
       if (filters.maxPrice && !isNaN(filters.maxPrice)) {
         filterConditions.push(Query.lessThanEqual("price", Number(filters.maxPrice)));
       }
-    
+
+      // 🌍 Country Filter
+      if (filters.country) {
+        filterConditions.push(Query.equal("country", filters.country));
+      }
+
+      // 🏡 Type Filter
+      if (filters.type) {
+        filterConditions.push(Query.equal("type", filters.type));
+      }
+
       try {
         const response = await db.listDocuments(
           "67a8e81100361d527692",
           "67b2fdc20027f4d55440",
           filterConditions
         );
+
+        console.log("✅ Fetched Listings:", response.documents);
         setListings(response.documents);
+
+        // 📌 Fetch seller data
+        const sellerUUIDs = [...new Set(response.documents.map((listing) => listing.sellerUUID))];
+
+        if (sellerUUIDs.length > 0) {
+          const sellerData = {};
+          await Promise.all(
+            sellerUUIDs.map(async (uuid) => {
+              try {
+                const sellerResponse = await db.listDocuments(
+                  "67a8e81100361d527692",
+                  "67a900dc003e3b7524ee",
+                  [Query.equal("uuid", uuid)]
+                );
+                if (sellerResponse.documents.length > 0) {
+                  sellerData[uuid] = sellerResponse.documents[0];
+                }
+              } catch (error) {
+                console.error(`❌ Error fetching seller for UUID ${uuid}:`, error);
+              }
+            })
+          );
+          console.log("✅ Fetched Sellers:", sellerData);
+          setSellers(sellerData);
+        }
       } catch (error) {
-        console.error("Error fetching listings:", error);
+        console.error("❌ Error fetching listings:", error);
       }
-    }    
+    }
 
     fetchListings();
   }, [searchQuery, filters]);
 
-  // ✅ Handle filter removal
   const removeFilter = (key) => {
     const updatedFilters = { ...filters };
     delete updatedFilters[key];
@@ -74,11 +115,15 @@ export default function Listings() {
     router.push(`/listings?${queryParams}`);
   };
 
+  function formatPrice(price) {
+    return price.toLocaleString("de-DE") + "€"; 
+  }
+
   return (
     <div className="p-10">
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-3xl font-bold">Search Results</h2>
-        
+        <h2 className="text-3xl font-bold">Listings</h2>
+
         {/* Filter Button */}
         <button
           onClick={() => setShowFilters(!showFilters)}
@@ -88,10 +133,10 @@ export default function Listings() {
         </button>
       </div>
 
-      {/* ✅ Applied Filters (Clickable Capsules) */}
+      {/* Applied Filters */}
       <div className="flex flex-wrap gap-2 mt-4">
         {Object.keys(filters)
-          .filter((key) => filters[key]) // Show only active filters
+          .filter((key) => filters[key])
           .map((key) => (
             <span
               key={key}
@@ -105,7 +150,7 @@ export default function Listings() {
           ))}
       </div>
 
-      {/* ✅ Animated Filter Sidebar */}
+      {/* Animated Filter Sidebar */}
       <AnimatePresence>
         {showFilters && (
           <motion.div
@@ -137,30 +182,18 @@ export default function Listings() {
               />
             </div>
 
-            {/* Property Type */}
-            <div className="mb-4">
-              <label className="block mb-1">Property Type</label>
-              <select
-                className="w-full p-2 rounded-lg text-black"
-                value={filters.type}
-                onChange={(e) => setFilters({ ...filters, type: e.target.value })}
-              >
-                <option value="">All</option>
-                <option value="buy">For Sale</option>
-                <option value="rent">For Rent</option>
-              </select>
-            </div>
-
-            {/* Country */}
+            {/* Country Filter */}
             <div className="mb-4">
               <label className="block mb-1">Country</label>
-              <input
-                type="text"
+              <select
                 className="w-full p-2 rounded-lg text-black"
-                placeholder="Enter country"
                 value={filters.country}
                 onChange={(e) => setFilters({ ...filters, country: e.target.value })}
-              />
+              >
+                <option value="">All</option>
+                <option value="Riga">Riga</option>
+                <option value="Lavantal">Lavantal</option>
+              </select>
             </div>
 
             {/* Close Filter Button */}
@@ -174,36 +207,52 @@ export default function Listings() {
         )}
       </AnimatePresence>
 
-      {/* 🔹 Listings Grid */}
+      {/* Listings Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6 mt-6">
-        {listings.length > 0 ? (
-          listings.map((listing) => (
-            <motion.div
-              key={listing.$id}
-              whileHover={{ scale: 1.05 }}
-              className="rounded-lg overflow-hidden shadow-lg bg-white"
-            >
-              <Link href={`/listing/${listing.$id}`}>
-                <div>
-                  <Image
-                    src={listing.images[0] || "/example.jpg"}
-                    width={400}
-                    height={300}
-                    alt={listing.title}
-                    className="w-full h-60 object-cover"
-                  />
-                  <div className="p-4">
-                    <h3 className="text-lg font-semibold">{listing.title}</h3>
-                    <p className="text-gray-500">{listing.description.substring(0, 50)}...</p>
-                    <p className="text-blue-600 font-bold mt-2">{listing.price}€</p>
-                  </div>
+      {listings.length > 0 ? (
+        listings.map((listing) => (
+          <motion.div key={listing.$id} whileHover={{ scale: 1.05 }} className="rounded-lg overflow-hidden shadow-lg bg-white">
+            <Link href={`/listing/${listing.$id}`}>
+              <div>
+                {/* Listing Image */}
+                <Image 
+                  src={listing.imageUrls?.[0] || "/example.jpg"} 
+                  width={400} 
+                  height={300} 
+                  alt={listing.title} 
+                  className="w-full h-60 object-cover" 
+                />
+                <div className="p-4">
+                  {/* Title & Description */}
+                  <h3 className="font-semibold text-2xl text-black">{listing.title}</h3>
+                  <p className="text-gray-500">{listing.description}</p>
+                  
+                  {/* Price (Formatted) */}
+                  <p className="text-blue-600 font-bold text-2xl mt-2">
+                    {formatPrice(listing.price)} ({listing.type === "buy" ? "Selling Price" : "Rent Price"})
+                  </p>
+
+                  {/* ✅ Seller's Info (Minecraft Head + Username) */}
+                  {sellers[listing.sellerUUID] && (
+                    <div className="flex items-center mt-4">
+                      <Image 
+                        src={`https://crafthead.net/helm/${sellers[listing.sellerUUID].uuid}`}
+                        width={40} 
+                        height={40} 
+                        alt="Seller Head"
+                        className="rounded-md"
+                      />
+                      <p className="ml-3 text-gray-700 font-semibold">{sellers[listing.sellerUUID].username}</p>
+                    </div>
+                  )}
                 </div>
-              </Link>
-            </motion.div>
-          ))
-        ) : (
-          <p className="text-gray-500 mt-4">No listings found for your search.</p>
-        )}
+              </div>
+            </Link>
+          </motion.div>
+        ))
+      ) : (
+        <p className="text-gray-500 mt-4">No listings found for your search.</p>
+      )}
       </div>
     </div>
   );

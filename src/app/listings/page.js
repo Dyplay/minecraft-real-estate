@@ -11,6 +11,7 @@ import { motion, AnimatePresence } from "framer-motion";
 export default function Listings() {
   const [listings, setListings] = useState([]);
   const [sellers, setSellers] = useState({});
+  const [totalListings, setTotalListings] = useState(0);
   const [filters, setFilters] = useState({
     minPrice: "",
     maxPrice: "",
@@ -74,6 +75,10 @@ export default function Listings() {
         console.log("✅ Fetched Listings:", response.documents);
         setListings(response.documents);
 
+        // 📌 Fetch total count of listings (regardless of search)
+        const totalResponse = await db.listDocuments("67a8e81100361d527692", "67b2fdc20027f4d55440");
+        setTotalListings(totalResponse.documents.length);
+
         // 📌 Fetch seller data
         const sellerUUIDs = [...new Set(response.documents.map((listing) => listing.sellerUUID))];
 
@@ -133,6 +138,13 @@ export default function Listings() {
         </button>
       </div>
 
+      {/* 🔍 Display Listing Count */}
+      <p className="text-gray-600 text-lg mb-4">
+        {searchQuery
+          ? `Found ${listings.length} results for "${searchQuery}"`
+          : `Total Listings: ${totalListings}`}
+      </p>
+
       {/* Applied Filters */}
       <div className="flex flex-wrap gap-2 mt-4">
         {Object.keys(filters)
@@ -149,63 +161,6 @@ export default function Listings() {
             </span>
           ))}
       </div>
-
-      {/* Animated Filter Sidebar */}
-      <AnimatePresence>
-        {showFilters && (
-          <motion.div
-            initial={{ x: "100%" }}
-            animate={{ x: 0 }}
-            exit={{ x: "100%" }}
-            transition={{ duration: 0.3 }}
-            className="fixed top-0 right-0 h-full w-72 bg-gray-900 text-white shadow-lg p-6"
-          >
-            <h3 className="text-xl font-bold mb-4">Filters</h3>
-
-            {/* Price Range */}
-            <div className="mb-4">
-              <label className="block mb-1">Min Price (€)</label>
-              <input
-                type="number"
-                className="w-full p-2 rounded-lg text-black"
-                value={filters.minPrice}
-                onChange={(e) => setFilters({ ...filters, minPrice: e.target.value })}
-              />
-            </div>
-            <div className="mb-4">
-              <label className="block mb-1">Max Price (€)</label>
-              <input
-                type="number"
-                className="w-full p-2 rounded-lg text-black"
-                value={filters.maxPrice}
-                onChange={(e) => setFilters({ ...filters, maxPrice: e.target.value })}
-              />
-            </div>
-
-            {/* Country Filter */}
-            <div className="mb-4">
-              <label className="block mb-1">Country</label>
-              <select
-                className="w-full p-2 rounded-lg text-black"
-                value={filters.country}
-                onChange={(e) => setFilters({ ...filters, country: e.target.value })}
-              >
-                <option value="">All</option>
-                <option value="Riga">Riga</option>
-                <option value="Lavantal">Lavantal</option>
-              </select>
-            </div>
-
-            {/* Close Filter Button */}
-            <button
-              onClick={() => setShowFilters(false)}
-              className="w-full mt-4 p-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
-            >
-              Close Filters
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* Listings Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6 mt-6">

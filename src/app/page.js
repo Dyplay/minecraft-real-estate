@@ -73,7 +73,7 @@ export default function Home() {
       {/* 🔹 Hero Section */}
       <div
         className="relative h-[60vh] bg-cover bg-center"
-        style={{ backgroundImage: "url('/example.jpg')" }}
+        style={{ backgroundImage: "url('/bg_real.jpg')" }}
       >
         <div className="absolute inset-0 bg-black/50 flex flex-col justify-center items-center text-center text-white">
           <h1 className="text-5xl font-bold">Find Your Dream Home</h1>

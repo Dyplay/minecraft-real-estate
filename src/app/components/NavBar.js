@@ -87,7 +87,7 @@ export default function Navbar() {
           type="text"
           placeholder="Search listings..."
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => setFilters({ ...filters, searchQuery: e.target.value })}
           onKeyDown={(e) => e.key === "Enter" && router.push(`/listings?search=${encodeURIComponent(search)}`)}
           className="bg-transparent text-white px-3 outline-none w-64 placeholder-gray-400"
         />

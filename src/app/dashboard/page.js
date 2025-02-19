@@ -376,87 +376,87 @@ const removeImage = (index) => {
 
       {/* Listing Form */}
       <motion.div className="w-full max-w-2xl p-6 bg-gray-800 border border-gray-700 shadow-lg rounded-lg mt-8">
-  <h2 className="text-xl font-semibold mb-4">{editingId ? "Edit Listing" : "Create a Listing"}</h2>
-  
-  {/* Title Input */}
-  <input 
-    type="text" 
-    placeholder="Title" 
-    className="w-full p-3 mb-4 bg-gray-700 text-white rounded" 
-    value={form.title} 
-    onChange={(e) => setForm({ ...form, title: e.target.value })} 
-  />
+    <h2 className="text-xl font-semibold mb-4">{editingId ? "Edit Listing" : "Create a Listing"}</h2>
+    
+    {/* Title Input */}
+    <input 
+      type="text" 
+      placeholder="Title" 
+      className="w-full p-3 mb-4 bg-gray-700 text-white rounded" 
+      value={form.title} 
+      onChange={(e) => setForm({ ...form, title: e.target.value })} 
+    />
 
-  {/* Description Input */}
-  <textarea 
-    placeholder="Description"
-    className="w-full p-3 mb-4 bg-gray-700 text-white rounded resize-none"
-    rows="4"
-    value={form.description}
-    onChange={(e) => setForm({ ...form, description: e.target.value })}
-  />
+    {/* Description Input */}
+    <textarea 
+      placeholder="Description"
+      className="w-full p-3 mb-4 bg-gray-700 text-white rounded resize-none"
+      rows="4"
+      value={form.description}
+      onChange={(e) => setForm({ ...form, description: e.target.value })}
+    />
 
-  {/* Price Input */}
-  <input 
-    type="number" 
-    placeholder="Price (€)" 
-    className="w-full p-3 mb-4 bg-gray-700 text-white rounded" 
-    value={form.price} 
-    onChange={(e) => setForm({ ...form, price: e.target.value })} 
-    required
-  />
+    {/* Price Input */}
+    <input 
+      type="number" 
+      placeholder="Price (€)" 
+      className="w-full p-3 mb-4 bg-gray-700 text-white rounded" 
+      value={form.price} 
+      onChange={(e) => setForm({ ...form, price: e.target.value })} 
+      required
+    />
 
-  {/* Country Dropdown */}
-  <select 
-    className="w-full p-3 mb-4 bg-gray-700 text-white rounded" 
-    value={form.country} 
-    onChange={(e) => setForm({ ...form, country: e.target.value })}
-    required
-  >
-    <option value="Riga">Riga</option>
-    <option value="Lavantal">Lavantal</option>
-  </select>
+    {/* Country Dropdown */}
+    <select 
+      className="w-full p-3 mb-4 bg-gray-700 text-white rounded" 
+      value={form.country} 
+      onChange={(e) => setForm({ ...form, country: e.target.value })}
+      required
+    >
+      <option value="Riga">Riga</option>
+      <option value="Lavantal">Lavantal</option>
+    </select>
 
-  {/* Image Upload Input (Max 5) */}
-  {/* Image Upload Input (Max 5) */}
-  <label className="block mb-2 text-gray-300">Upload Images (Max 5)</label>
-  <input 
-    type="file" 
-    multiple 
-    accept="image/*" 
-    onChange={handleFileChange} 
-  />
-  <p className="text-sm text-gray-400 mt-1">Max 5 images allowed</p>
+    {/* Image Upload Input (Max 5) */}
+    {/* Image Upload Input (Max 5) */}
+    <label className="block mb-2 text-gray-300">Upload Images (Max 5)</label>
+    <input 
+      type="file" 
+      multiple 
+      accept="image/*" 
+      onChange={handleFileChange} 
+    />
+    <p className="text-sm text-gray-400 mt-1">Max 5 images allowed</p>
 
- {/* Image Preview Section */}
-<div className="grid grid-cols-6 gap-1 mt-3">
-  {imageFiles.map((file, index) => {
-    const previewUrl = URL.createObjectURL(file); // ✅ Generate preview URL
+  {/* Image Preview Section */}
+  <div className="grid grid-cols-6 gap-1 mt-3">
+    {imageFiles.map((file, index) => {
+      const previewUrl = URL.createObjectURL(file); // ✅ Generate preview URL
 
-    return (
-      <div key={index} className="relative">
-        <Image src={previewUrl} width={100} height={80} alt="Preview" className="rounded" />
-        
-        {/* Remove Image Button (Top Right Corner) */}
-        <button 
-          className="absolute top-0 left-0 bg-red-600 text-white rounded-full w-6 h-6 flex items-center justify-center"
-          onClick={() => removeImage(index)}
-        >
-          ✖
-        </button>
-      </div>
-    );
-  })}
-</div>
+      return (
+        <div key={index} className="relative">
+          <Image src={previewUrl} width={100} height={80} alt="Preview" className="rounded" />
+          
+          {/* Remove Image Button (Top Right Corner) */}
+          <button 
+            className="absolute top-0 left-0 bg-red-600 text-white rounded-full w-6 h-6 flex items-center justify-center"
+            onClick={() => removeImage(index)}
+          >
+            ✖
+          </button>
+        </div>
+      );
+    })}
+  </div>
 
-  {/* Submit Button */}
-  <button 
-    onClick={handleListing} 
-    className="w-full p-3 bg-blue-500 mt-4 rounded hover:bg-blue-600 transition"
-  >
-    {submitting ? "Processing..." : editingId ? "Update Listing" : "Create Listing"}
-  </button>
-</motion.div>
+    {/* Submit Button */}
+    <button 
+      onClick={handleListing} 
+      className="w-full p-3 bg-blue-500 mt-4 rounded hover:bg-blue-600 transition"
+    >
+      {submitting ? "Processing..." : editingId ? "Update Listing" : "Create Listing"}
+    </button>
+  </motion.div>
 
       {/* Active Listings */}
       <h2 className="text-3xl font-bold mt-12">Your Active Listings</h2>
@@ -493,6 +493,18 @@ const removeImage = (index) => {
                   ✏️ Edit
                 </button>
               </div>
+
+              {listing.buyerUUID ? (
+                <div className="mt-4 p-4 bg-green-100 border-l-4 border-green-500">
+                  <p className="text-green-700 font-semibold">
+                    ✅ Sold to: {listing.buyerUsername}
+                  </p>
+                  <p className="text-sm">Transaction Date: {new Date(listing.purchaseDate).toLocaleDateString()}</p>
+                  <p className="text-sm">Receipt Code: {listing.receiptCode}</p>
+                </div>
+              ) : (
+                <p className="text-gray-500 mt-4">🟢 Available for sale</p>
+              )}
             </div>
           ))
         ) : (

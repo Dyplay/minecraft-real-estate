@@ -26,8 +26,8 @@ export default function Listings() {
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const query = searchParams.get("search") || "";
-      setSearchQuery(query);
+      const queryParams = new URLSearchParams(filters).toString();
+      router.push(`/listings?${queryParams}`);
     }
   }, [searchParams]);
 
@@ -117,13 +117,21 @@ export default function Listings() {
       return updatedFilters;
     });
   
-    const queryParams = new URLSearchParams(filters).toString();
+    // ✅ Update the URL correctly
+    const queryParams = new URLSearchParams({
+      ...filters,
+      [key]: "", // Remove the key
+    }).toString();
+    
     router.push(`/listings?${queryParams}`);
   };  
 
   function formatPrice(price) {
-    return price.toLocaleString("de-DE") + "€"; 
-  }
+    return new Intl.NumberFormat("de-DE", {
+      style: "currency",
+      currency: "EUR",
+    }).format(price);
+  }  
 
   return (
     <div className="p-10">
@@ -259,16 +267,18 @@ export default function Listings() {
                   </p>
 
                   {/* ✅ Seller's Info (Minecraft Head + Username) */}
-                  {sellers[listing.sellerUUID] && (
+                  { sellers[listing.sellerUUID] && (
                     <div className="flex items-center mt-4">
                       <Image 
-                        src={`https://crafthead.net/helm/${sellers[listing.sellerUUID].uuid}`}
+                        src={`https://crafthead.net/helm/${sellers[listing.sellerUUID]?.uuid}`}
                         width={40} 
                         height={40} 
                         alt="Seller Head"
                         className="rounded-md"
                       />
-                      <p className="ml-3 text-gray-700 font-semibold">{sellers[listing.sellerUUID].username}</p>
+                      <p className="ml-3 text-gray-700 font-semibold">
+                        {sellers[listing.sellerUUID]?.username || "Unknown Seller"}
+                      </p>
                     </div>
                   )}
                 </div>

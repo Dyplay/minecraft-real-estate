@@ -97,9 +97,13 @@ export default function Navbar() {
       </div>
 
       {/* User Dropdown */}
+      {/* User Dropdown */}
       {user ? (
         <div className="relative">
-          <button onClick={() => setDropdown(!dropdown)} className="flex items-center gap-2 hover:text-gray-400 transition">
+          <button
+            onClick={() => setDropdown(!dropdown)}
+            className="flex items-center gap-2 hover:text-gray-400 transition relative z-50"
+          >
             <Image
               src={user.avatar || "/example.jpg"}
               width={32}
@@ -112,8 +116,8 @@ export default function Navbar() {
           </button>
 
           {dropdown && (
-            <div className="absolute right-0 mt-2 w-48 bg-white text-black rounded-lg shadow-lg">
-              <Link href="/dashboard" className="block px-4 py-2 hover:bg-gray-200 transition">
+            <div className="absolute right-0 mt-2 w-48 bg-white text-black rounded-lg shadow-lg z-50 border border-gray-200">
+              <Link href="/dashboard" className="block px-4 py-2 hover:bg-gray-200 hover:rounded-lg transition">
                 Dashboard
               </Link>
               <button
@@ -121,7 +125,7 @@ export default function Navbar() {
                   await account.deleteSession("current"); // ✅ Logout function
                   window.location.href = "/";
                 }}
-                className="w-full text-left px-4 py-2 hover:bg-gray-200 transition"
+                className="w-full text-left px-4 py-2 hover:bg-gray-200 hover:rounded-lg transition"
               >
                 Logout
               </button>
@@ -129,7 +133,7 @@ export default function Navbar() {
           )}
         </div>
       ) : (
-        <Link href="/login" className="bg-blue-500 px-4 py-2 rounded hover:bg-blue-600 transition">
+        <Link href="/login" className="bg-blue-500 px-4 py-2 rounded hover:bg-blue-600 hover:rounded-lg transition">
           Login
         </Link>
       )}

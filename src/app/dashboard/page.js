@@ -118,6 +118,17 @@ async function uploadImages(existingImages = []) {
       return;
     }
   
+    const formattedPrice = parseFloat(form.price);
+    if (isNaN(formattedPrice)) {
+      toast.error("⚠ Price must be a valid number!");
+      return;
+    }
+  
+    if (formattedPrice > 10000000000) {
+      toast.error("⚠ Price cannot exceed 10,000,000,000!");
+      return;
+    }
+  
     setSubmitting(true);
     const documentId = editingId || ID.unique();
   
@@ -137,17 +148,11 @@ async function uploadImages(existingImages = []) {
         sellerUUID: user.uuid,
         title: form.title,
         description: form.description,
-        price: parseFloat(form.price),
+        price: formattedPrice,
         country: form.country,
         type: form.type,
         imageUrls: uploadedImages, // ✅ Updated image list
       };
-  
-      if (isNaN(listingData.price)) {
-        toast.error("⚠ Price must be a valid number!");
-        setSubmitting(false);
-        return;
-      }
   
       if (editingId) {
         await db.updateDocument("67a8e81100361d527692", "67b2fdc20027f4d55440", editingId, listingData);
@@ -171,7 +176,7 @@ async function uploadImages(existingImages = []) {
     } finally {
       setSubmitting(false);
     }
-}  
+  }  
 
 const removeImage = (index) => {
   setImageFiles((prevFiles) => prevFiles.filter((_, i) => i !== index)); // ✅ Remove by index
@@ -218,11 +223,17 @@ const removeImage = (index) => {
 
   const handleEditSubmit = async () => {
     if (!currentEditId) return;
-    
+  
     // ✅ Convert price to a float safely
     const formattedPrice = parseFloat(editForm.price);
+    
     if (isNaN(formattedPrice)) {
       toast.error("❌ Price must be a valid number!");
+      return;
+    }
+  
+    if (formattedPrice > 10000000000) {
+      toast.error("⚠ Price cannot exceed 10,000,000,000!");
       return;
     }
   
@@ -316,13 +327,20 @@ const removeImage = (index) => {
               onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
             />
 
-            <input 
-              type="number" 
-              placeholder="Price (€)" 
-              className="w-full p-2 mb-3 bg-gray-800 text-white rounded" 
-              value={editForm.price} 
-              onChange={(e) => setEditForm({ ...editForm, price: e.target.value.replace(/[^0-9.]/g, '') })}
-            />
+              <input 
+                type="number" 
+                placeholder="Price (€)" 
+                className="w-full p-2 mb-3 bg-gray-800 text-white rounded" 
+                value={editForm.price} 
+                onChange={(e) => {
+                  const price = e.target.value.replace(/[^0-9.]/g, ''); // ✅ Allow only numbers & dots
+                  if (parseFloat(price) > 10000000000) {
+                    toast.error("⚠ Price cannot exceed 10,000,000,000!");
+                    return;
+                  }
+                  setEditForm({ ...editForm, price });
+                }}
+              />
 
             <select 
               className="w-full p-2 mb-3 bg-gray-800 text-white rounded" 
@@ -385,6 +403,7 @@ const removeImage = (index) => {
     className="w-full p-3 mb-4 bg-gray-700 text-white rounded" 
     value={form.price} 
     onChange={(e) => setForm({ ...form, price: e.target.value })} 
+    required
   />
 
   {/* Country Dropdown */}
@@ -392,6 +411,7 @@ const removeImage = (index) => {
     className="w-full p-3 mb-4 bg-gray-700 text-white rounded" 
     value={form.country} 
     onChange={(e) => setForm({ ...form, country: e.target.value })}
+    required
   >
     <option value="Riga">Riga</option>
     <option value="Lavantal">Lavantal</option>

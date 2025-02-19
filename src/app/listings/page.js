@@ -112,13 +112,14 @@ export default function Listings() {
   }, [searchQuery, filters]);
 
   const removeFilter = (key) => {
-    const updatedFilters = { ...filters };
-    delete updatedFilters[key];
-    setFilters(updatedFilters);
-
-    const queryParams = new URLSearchParams(updatedFilters).toString();
+    setFilters((prevFilters) => {
+      const updatedFilters = { ...prevFilters, [key]: "" }; // ✅ Reset filter instead of deleting
+      return updatedFilters;
+    });
+  
+    const queryParams = new URLSearchParams(filters).toString();
     router.push(`/listings?${queryParams}`);
-  };
+  };  
 
   function formatPrice(price) {
     return price.toLocaleString("de-DE") + "€"; 
@@ -126,6 +127,76 @@ export default function Listings() {
 
   return (
     <div className="p-10">
+      {/* Animated Filter Sidebar */}
+      <AnimatePresence>
+        {showFilters && (
+          <motion.div
+            initial={{ x: "100%" }}
+            animate={{ x: 0 }}
+            exit={{ x: "100%" }}
+            transition={{ duration: 0.3 }}
+            className="fixed top-0 right-0 h-full w-72 bg-gray-900 text-white shadow-lg p-6"
+          >
+            <h3 className="text-xl font-bold mb-4">Filters</h3>
+
+            {/* Price Range */}
+            <div className="mb-4">
+              <label className="block mb-1">Min Price (€)</label>
+              <input
+                type="number"
+                className="w-full p-2 rounded-lg text-black"
+                value={filters.minPrice}
+                onChange={(e) => setFilters({ ...filters, minPrice: e.target.value })}
+              />
+            </div>
+            <div className="mb-4">
+              <label className="block mb-1">Max Price (€)</label>
+              <input
+                type="number"
+                className="w-full p-2 rounded-lg text-black"
+                value={filters.maxPrice}
+                onChange={(e) => setFilters({ ...filters, maxPrice: e.target.value })}
+              />
+            </div>
+
+            {/* Country Filter */}
+            <div className="mb-4">
+              <label className="block mb-1">Country</label>
+              <select
+                className="w-full p-2 rounded-lg text-black"
+                value={filters.country}
+                onChange={(e) => setFilters({ ...filters, country: e.target.value })}
+              >
+                <option value="">All</option>
+                <option value="Riga">Riga</option>
+                <option value="Lavantal">Lavantal</option>
+              </select>
+            </div>
+
+            {/* Type Filter */}
+            <div className="mb-4">
+              <label className="block mb-1">Type</label>
+              <select
+                className="w-full p-2 rounded-lg text-black"
+                value={filters.type}
+                onChange={(e) => setFilters({ ...filters, type: e.target.value })}
+              >
+                <option value="">All</option>
+                <option value="buy">Buy</option>
+                <option value="rent">Rent</option>
+              </select>
+            </div>
+
+            {/* Apply & Close Filters */}
+            <button
+              onClick={() => setShowFilters(false)}
+              className="w-full mt-4 p-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
+            >
+              Close Filters
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-3xl font-bold">Listings</h2>
 

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { db, Query, storage, account, ID, client } from "../../../../lib/appwrite";
+import Skeleton from "../../../app/components/ListingSkeleton";
 import Image from "next/image";
 import { toast } from "react-toastify";
 
@@ -324,7 +325,7 @@ export default function ListingPage() {
     return unsubscribe;
   }  
 
-  if (loading) return <p>Loading...</p>;
+  if (loading) return <Skeleton />;
   if (!listing) return <p>Listing not found.</p>;
 
   return (
@@ -375,6 +376,7 @@ export default function ListingPage() {
     🧐 This is your listing
   </div>
 )}
+
   <h1 className="text-3xl font-bold text-black">{listing.title}</h1>
   <p className="mt-2 text-gray-600">{listing.description}</p>
   <p className="mt-2 text-gray-600 flex items-center">

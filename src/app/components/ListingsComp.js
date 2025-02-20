@@ -7,6 +7,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { FaTimes, FaFilter } from "react-icons/fa";
 import { motion, AnimatePresence } from "framer-motion";
+import Skeleton from "./Skeleton";
 
 export default function Listings() {
   const searchParams = useSearchParams();
@@ -205,11 +206,38 @@ export default function Listings() {
           listings.map((listing) => (
             <motion.div key={listing.$id} whileHover={{ scale: 1.05 }} className="rounded-lg overflow-hidden shadow-lg bg-white">
               <Link href={`/listing/${listing.$id}`}>
-                <Image src={listing.imageUrls?.[0] || "/example.jpg"} width={400} height={300} alt={listing.title} className="w-full h-60 object-cover" />
+                <Image 
+                  src={listing.imageUrls?.[0] || "/example.jpg"} 
+                  width={400} 
+                  height={300} 
+                  alt={listing.title} 
+                  className="w-full h-60 object-cover" 
+                />
                 <div className="p-4">
+                  {/* Listing Title & Description */}
                   <h3 className="font-semibold text-2xl text-black">{listing.title}</h3>
                   <p className="text-gray-500">{listing.description}</p>
+
+                  {/* Price */}
                   <p className="text-blue-600 font-bold text-2xl mt-2">{formatPrice(listing.price)}</p>
+
+                  {/* 🏷️ Seller Information */}
+                  {sellers[listing.sellerUUID] ? (
+                    <div className="flex items-center mt-4">
+                      <Image 
+                        src={`https://crafthead.net/helm/${sellers[listing.sellerUUID]?.uuid}`} 
+                        width={40} 
+                        height={40} 
+                        alt="Seller Head" 
+                        className="rounded-md"
+                      />
+                      <p className="ml-3 text-gray-700 font-semibold">
+                        {sellers[listing.sellerUUID]?.username || "Unknown Seller"}
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-gray-500 mt-2">Seller: Unknown</p>
+                  )}
                 </div>
               </Link>
             </motion.div>

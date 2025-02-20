@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { db, account, Query } from "../../../lib/appwrite"; // ✅ Ensure correct import
+import { db, account, Query } from "../../../lib/appwrite";
 import Link from "next/link";
 import Image from "next/image";
 import { FaSearch, FaChevronDown } from "react-icons/fa";
@@ -25,7 +25,6 @@ export default function Navbar() {
           return;
         }
 
-        // ✅ Step 1: Get current **external** IP
         let ipData;
         try {
           const ipResponse = await fetch("https://api64.ipify.org?format=json");
@@ -38,7 +37,6 @@ export default function Navbar() {
         const userIP = ipData.ip;
         console.log("🌐 Fetched User IP:", userIP);
 
-        // ✅ Step 2: Find user by **IP Address**
         const userResponse = await db.listDocuments("67a8e81100361d527692", "67a900dc003e3b7524ee", [
           Query.equal("ip", userIP),
         ]);
@@ -51,12 +49,11 @@ export default function Navbar() {
         const userData = userResponse.documents[0];
         console.log("✅ Found User Data:", userData);
 
-        // ✅ Step 3: Fetch Minecraft Username from Mojang API
         let mcUsername = "Unknown";
         try {
           const mcResponse = await fetch(`https://rigabank.dyplay.at/api/uuid?uuid=${userData.uuid}`);
           const mcData = await mcResponse.json();
-          mcUsername = mcData.name; // Get latest name
+          mcUsername = mcData.name;
         } catch (error) {
           console.error("🚨 Failed to fetch Minecraft username:", error);
         }
@@ -64,7 +61,7 @@ export default function Navbar() {
         setUser({
           ...userData,
           mcUsername: mcUsername,
-          avatar: `https://crafthead.net/helm/${userData.uuid}`, // ✅ Minecraft PFP
+          avatar: `https://crafthead.net/helm/${userData.uuid}`,
         });
 
       } catch (error) {
@@ -81,22 +78,28 @@ export default function Navbar() {
         Immobilien
       </Link>
 
-      {/* 🔍 Search Bar */}
+      {/* 🔍 Search Bar (Fixed) */}
       <div className="relative flex items-center bg-gray-800 rounded-full p-2 shadow-lg">
         <input
           type="text"
           placeholder="Search listings..."
           value={search}
-          onChange={(e) => setFilters({ ...filters, searchQuery: e.target.value })}
-          onKeyDown={(e) => e.key === "Enter" && router.push(`/listings?search=${encodeURIComponent(search)}`)}
+          onChange={(e) => setSearch(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              router.push(`/listings?search=${encodeURIComponent(search)}`);
+            }
+          }}
           className="bg-transparent text-white px-3 outline-none w-64 placeholder-gray-400"
         />
-        <button onClick={() => router.push(`/listings?search=${encodeURIComponent(search)}`)} className="p-2 hover:bg-gray-700 rounded-full transition">
+        <button
+          onClick={() => router.push(`/listings?search=${encodeURIComponent(search)}`)}
+          className="p-2 hover:bg-gray-700 rounded-full transition"
+        >
           <FaSearch className="text-white" />
         </button>
       </div>
 
-      {/* User Dropdown */}
       {/* User Dropdown */}
       {user ? (
         <div className="relative">
@@ -111,7 +114,7 @@ export default function Navbar() {
               alt="User Avatar"
               className="rounded-md"
             />
-            <span>{user.mcUsername}</span> {/* ✅ Show Minecraft Username */}
+            <span>{user.mcUsername}</span> 
             <FaChevronDown />
           </button>
 
@@ -122,7 +125,7 @@ export default function Navbar() {
               </Link>
               <button
                 onClick={async () => {
-                  await account.deleteSession("current"); // ✅ Logout function
+                  await account.deleteSession("current");
                   window.location.href = "/";
                 }}
                 className="w-full text-left px-4 py-2 hover:bg-gray-200 hover:rounded-lg transition"

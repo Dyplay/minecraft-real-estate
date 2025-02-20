@@ -2,6 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { FaCheckCircle } from "react-icons/fa";
+import { Tooltip } from "react-tooltip";
+import { useTrustedSellers } from "../../components/TrustedSellersProvider";
 import { db, Query, storage, account, ID, client } from "../../../../lib/appwrite";
 import Skeleton from "../../../app/components/ListingSkeleton";
 import Image from "next/image";
@@ -10,12 +13,13 @@ import { toast } from "react-toastify";
 export default function ListingPage() {
   const router = useRouter();
   const { id } = useParams(); // ✅ Get ID from URL params
+  const verifiedSellers = useTrustedSellers();
 
   const [listing, setListing] = useState(null);
   const [reviews, setReviews] = useState([]);
   const [user, setUser] = useState(null); // ✅ Add user state
   const [review, setReview] = useState({ rating: 5, comment: "" });
-  const [seller, setSeller] = useState(null);
+  const [seller, setSeller] = useState(null); // ✅ Declared FIRST
   const [showPurchasePopup, setShowPurchasePopup] = useState(false);
   const [purchaseStep, setPurchaseStep] = useState("Authenticating request...");
   const [loading, setLoading] = useState(true);
@@ -158,6 +162,8 @@ export default function ListingPage() {
     fetchReviews();
     fetchUser();
   }, [id]);
+
+  const isTrusted = seller ? verifiedSellers.includes(seller.uuid) : false;
 
   async function handlePurchase() {
     if (!user || !user.uuid) {
@@ -427,10 +433,37 @@ export default function ListingPage() {
         className="rounded-md border border-gray-300"
         alt="Seller Avatar"
       />
-      <div>
-        <p className="text-lg font-semibold text-black">{seller.username}</p>
-        <p className="text-sm text-gray-500">Seller UUID: {seller.uuid}</p>
-      </div>
+    <div className="flex items-center gap-2">
+       {/* Seller Info Container */}
+  <div className="flex flex-col">
+    {/* Seller Name & Checkmark */}
+    <div className="flex items-center gap-2">
+      <p className="text-lg font-semibold text-black">{seller.username}</p>
+      
+      {seller && isTrusted && (
+        <span
+          className="text-blue-500 flex items-center"
+          data-tooltip-id="trusted-seller-tooltip"
+        >
+          <FaCheckCircle className="text-lg" />
+        </span>
+      )}
+    </div>
+
+    {/* UUID Display */}
+    <p className="text-sm text-gray-500">
+      <span className="font-semibold">Seller UUID:</span> {seller.uuid}
+    </p>
+  </div>
+</div>
+
+    {seller && isTrusted && (
+      <Tooltip id="trusted-seller-tooltip">
+        <p className="text-white text-sm">
+          ✅ This is a <strong>trusted seller</strong> verified by our team.
+        </p>
+      </Tooltip>
+    )}
     </div>
   )}
 

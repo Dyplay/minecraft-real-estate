@@ -333,60 +333,68 @@ export default function ListingPage() {
     }
   }
 
-  async function listenForPurchaseConfirmation(purchaseId, buyerAccountId, sellerUUID) {
+  async function listenForPurchaseConfirmation(purchaseId, buyerUUID, sellerUUID) {
     console.log(`🔄 Listening for purchase confirmation for ID: ${purchaseId}`);
-
+  
     const unsubscribe = client.subscribe(
-      `databases.67a8e81100361d527692.collections.67b6049900036a440ded.documents`,
+      `databases.67a8e81100361d527692.collections.67b6049900036a440ded.documents.${purchaseId}`,
       async (response) => {
         console.log("📩 Received real-time update:", response);
-
-        if (response.events.includes(`databases.*.collections.67b6049900036a440ded.documents.${purchaseId}.update`)) {
+  
+        if (response.events.includes(`databases.*.collections.*.documents.${purchaseId}.update`)) {
           if (response.payload.confirmed) {
             console.log("✅ Purchase confirmed!");
-
+  
             try {
-              // ✅ Fetch buyer's account
-              const buyerAccountResponse = await db.getDocument(
-                "67a8e81100361d527692", // Database ID
-                "67b093040006e14307e1", // User Accounts Collection ID
-                buyerAccountId // ✅ Use buyer's ID
+              // ✅ Fetch Buyer's Account (Using UUID)
+              const buyerAccountResponse = await db.listDocuments(
+                "67a8e81100361d527692",
+                "67b093040006e14307e1",
+                [Query.equal("user_uuid", buyerUUID)]
               );
-
-              if (!buyerAccountResponse) {
+  
+              if (buyerAccountResponse.documents.length === 0) {
                 console.error("❌ Buyer account not found!");
                 return;
               }
-
-              // ✅ Fetch seller's account
+  
+              const buyerAccount = buyerAccountResponse.documents[0];
+  
+              // ✅ Fetch Seller's Account (Using UUID)
               const sellerAccountResponse = await db.listDocuments(
-                "67a8e81100361d527692", // Database ID
-                "67b093040006e14307e1", // User Accounts Collection ID
-                [Query.equal("user_name", seller.username)] // ✅ Find seller by username
+                "67a8e81100361d527692",
+                "67b093040006e14307e1",
+                [Query.equal("user_uuid", sellerUUID)]
               );
-
+  
               if (sellerAccountResponse.documents.length === 0) {
                 console.error("❌ Seller account not found!");
                 return;
               }
-
+  
               const sellerAccount = sellerAccountResponse.documents[0];
-
+  
               // ✅ Deduct money from the buyer
-              await db.updateDocument("67a8e81100361d527692", "67b093040006e14307e1", buyerAccountId, {
-                balance: buyerAccountResponse.balance - response.payload.price, // ✅ Corrected to use buyer's balance
+              if (buyerAccount.balance < response.payload.price) {
+                console.error("❌ Insufficient funds, transaction aborted.");
+                toast.error("❌ Insufficient funds, transaction aborted.");
+                return;
+              }
+  
+              await db.updateDocument("67a8e81100361d527692", "67b093040006e14307e1", buyerAccount.$id, {
+                balance: buyerAccount.balance - response.payload.price, // Correct balance deduction
               });
-
+  
               // ✅ Add money to the seller
               await db.updateDocument("67a8e81100361d527692", "67b093040006e14307e1", sellerAccount.$id, {
                 balance: sellerAccount.balance + response.payload.price,
               });
-
+  
               // ✅ Mark listing as sold
               await db.updateDocument("67a8e81100361d527692", "67b2fdc20027f4d55440", response.payload.listingId, {
                 available: false,
               });
-
+  
               // ✅ Redirect to receipt page
               setPurchaseStep("✅ Purchase Confirmed! Redirecting to receipt...");
               setTimeout(() => {
@@ -401,9 +409,9 @@ export default function ListingPage() {
         }
       }
     );
-
+  
     return unsubscribe;
-}
+  }  
 
   if (loading) return <Skeleton />;
   if (!listing) return <p>Listing not found.</p>;

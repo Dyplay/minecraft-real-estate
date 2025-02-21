@@ -333,7 +333,7 @@ export default function ListingPage() {
     }
   }
 
-  async function listenForPurchaseConfirmation(purchaseId, buyerUUID, sellerUUID) {
+  async function listenForPurchaseConfirmation(purchaseId, buyerUsername, sellerUsername) {
     console.log(`🔄 Listening for purchase confirmation for ID: ${purchaseId}`);
   
     const unsubscribe = client.subscribe(
@@ -346,11 +346,11 @@ export default function ListingPage() {
             console.log("✅ Purchase confirmed!");
   
             try {
-              // ✅ Fetch Buyer's Account (Using UUID)
+              // ✅ Fetch Buyer's Account (Using `user_name`)
               const buyerAccountResponse = await db.listDocuments(
                 "67a8e81100361d527692",
                 "67b093040006e14307e1",
-                [Query.equal("user_uuid", buyerUUID)]
+                [Query.equal("user_name", buyerUsername)] // ✅ Changed `user_uuid` → `user_name`
               );
   
               if (buyerAccountResponse.documents.length === 0) {
@@ -360,11 +360,11 @@ export default function ListingPage() {
   
               const buyerAccount = buyerAccountResponse.documents[0];
   
-              // ✅ Fetch Seller's Account (Using UUID)
+              // ✅ Fetch Seller's Account (Using `user_name`)
               const sellerAccountResponse = await db.listDocuments(
                 "67a8e81100361d527692",
                 "67b093040006e14307e1",
-                [Query.equal("user_uuid", sellerUUID)]
+                [Query.equal("user_name", sellerUsername)] // ✅ Changed `user_uuid` → `user_name`
               );
   
               if (sellerAccountResponse.documents.length === 0) {
@@ -382,7 +382,7 @@ export default function ListingPage() {
               }
   
               await db.updateDocument("67a8e81100361d527692", "67b093040006e14307e1", buyerAccount.$id, {
-                balance: buyerAccount.balance - response.payload.price, // Correct balance deduction
+                balance: buyerAccount.balance - response.payload.price, // ✅ Deducted correctly
               });
   
               // ✅ Add money to the seller

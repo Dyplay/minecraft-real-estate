@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import dotenv from "dotenv";
 import { FaCheckCircle } from "react-icons/fa";
 import { Tooltip } from "react-tooltip";
 import { useTrustedSellers } from "../../components/TrustedSellersProvider";
@@ -9,6 +10,7 @@ import { db, Query, storage, account, ID, client } from "../../../../lib/appwrit
 import Skeleton from "../../../app/components/ListingSkeleton";
 import Image from "next/image";
 import { toast } from "react-toastify";
+dotenv.config();
 
 export default function ListingPage() {
   const router = useRouter();
@@ -16,6 +18,9 @@ export default function ListingPage() {
   const verifiedSellers = useTrustedSellers();
 
   const [listing, setListing] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportReason, setReportReason] = useState("");
   const [reviews, setReviews] = useState([]);
   const [user, setUser] = useState(null); // ✅ Add user state
   const [review, setReview] = useState({ rating: 5, comment: "" });
@@ -164,6 +169,63 @@ export default function ListingPage() {
   }, [id]);
 
   const isTrusted = seller ? verifiedSellers.includes(seller.uuid) : false;
+  
+  async function handleReportSubmit() {
+    if (!reportReason) {
+      toast.warn("⚠️ Please select a reason before submitting.");
+      return;
+    }
+  
+    setIsLoading(true); // Start loading
+  
+    try {
+      // ✅ Load Webhook URL Securely
+      const webhookUrl = "https://discord.com/api/webhooks/1342257889888440320/By77PrA6Sg7H0Ct1UHqD2csOWW-xZFdljwcW0JikU3GGEoppe4uui7ZQDxxBKG8StWVZ";
+  
+      if (!webhookUrl) {
+        throw new Error("Webhook URL is missing! Check your .env.local file.");
+      }
+  
+      // ✅ Construct the payload
+      const payload = {
+        content: `🚨 **New Listing Report** 🚨 @everyone`,
+        embeds: [
+          {
+            title: "Reported Listing",
+            description: `A listing has been reported.`,
+            color: 16711680, // Red color
+            fields: [
+              { name: "Reason", value: reportReason, inline: false },
+              { name: "Reported By", value: user.username, inline: true },
+              { name: "Discord User", value: user.discordUser || "N/A", inline: true },
+              { name: "Minecraft User", value: user.mcUsername || "N/A", inline: true },
+              { name: "Listing Title", value: listing.title, inline: false },
+              { name: "Seller", value: seller.username, inline: true },
+              { name: "Seller UUID", value: seller.uuid, inline: true },
+              { name: "Listing Link", value: `https://realestate.dyplay.at/listing/${id}`, inline: false },
+            ],
+          },
+        ],
+      };
+  
+      // ✅ Send Webhook Request
+      await fetch(webhookUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+  
+      // ✅ Show success message and close modal
+      toast.success("✅ Report submitted successfully!");
+      setShowReportModal(false);
+      setReportReason(""); // Clear selected reason
+    } catch (error) {
+      console.error("🚨 Error sending report:", error);
+      toast.error("❌ Failed to submit report.");
+    } finally {
+      setIsLoading(false); // Stop loading
+    }
+  }  
 
   async function handlePurchase() {
     if (!user || !user.uuid) {
@@ -336,6 +398,50 @@ export default function ListingPage() {
 
   return (
     <div className="container mx-auto p-6 flex flex-col lg:flex-row gap-8">
+      {/* Report Modal */}
+      {showReportModal && (
+  <div className="fixed inset-0 flex justify-center items-center bg-black bg-opacity-50 z-50">
+    <div className="bg-white p-6 rounded-lg shadow-lg text-center w-[90%] max-w-md">
+      <h2 className="text-xl font-semibold text-black">Report Listing</h2>
+      <p className="text-red-500 text-sm mt-2">
+        ⚠️ Mass false reporting is bannable.
+      </p>
+
+      {/* Dropdown for selecting a reason */}
+      <select
+        className="w-full mt-4 p-2 border rounded-md text-black"
+        value={reportReason}
+        onChange={(e) => setReportReason(e.target.value)}
+      >
+        <option value="">Select a reason...</option>
+        <option value="Inappropriate Content">Inappropriate Content</option>
+        <option value="Not Their Property">Not Their Property</option>
+        <option value="Scam / Fraud">Scam / Fraud</option>
+      </select>
+
+      {/* Submit Button */}
+      <button
+        onClick={handleReportSubmit}
+        className={`mt-4 w-full py-2 rounded-lg text-white font-bold transition ${
+          isLoading
+            ? "bg-gray-400 cursor-not-allowed"
+            : "bg-red-500 hover:bg-red-600"
+        }`}
+        disabled={isLoading}
+      >
+        {isLoading ? "Submitting..." : "Submit Report"}
+      </button>
+
+      {/* Close Button */}
+      <button
+        onClick={() => setShowReportModal(false)}
+        className="mt-2 text-gray-500 hover:underline"
+      >
+        Cancel
+      </button>
+    </div>
+  </div>
+)}
       {showPurchasePopup && (
         <div className="fixed inset-0 flex justify-center items-center bg-black bg-opacity-50 z-[9999]">
           <div className="bg-white p-6 rounded-lg shadow-lg text-center w-[90%] max-w-md z-[10000]">
@@ -466,6 +572,13 @@ export default function ListingPage() {
     )}
     </div>
   )}
+
+<p
+  className="mt-4 text-red-500 text-sm cursor-pointer hover:underline"
+  onClick={() => setShowReportModal(true)}
+>
+  🚨 Report this post
+</p>
 
   {/* 🔹 Reviews Section */}
 <div className="mt-8">

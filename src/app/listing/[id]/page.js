@@ -364,7 +364,7 @@ export default function ListingPage() {
               const sellerAccountResponse = await db.listDocuments(
                 "67a8e81100361d527692",
                 "67b093040006e14307e1",
-                [Query.equal("user_name", sellerUsername)] // ✅ Changed `user_uuid` → `user_name`
+                [Query.contains("user_name", buyerUsername)] // ✅ Changed `user_uuid` → `user_name`
               );
   
               if (sellerAccountResponse.documents.length === 0) {

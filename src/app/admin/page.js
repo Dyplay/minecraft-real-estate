@@ -12,6 +12,9 @@ export default function AdminPanel() {
   const [content, setContent] = useState("");
   const [author, setAuthor] = useState("");
   const [loading, setLoading] = useState(true);
+  const [users, setUsers] = useState([]);
+  const [bannedUsers, setBannedUsers] = useState([]);
+  const [isLoadingUsers, setIsLoadingUsers] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
 
   // ✅ List of allowed Admin UUIDs
@@ -82,8 +85,51 @@ export default function AdminPanel() {
       }
     }
 
+    async function fetchUsers() {
+      try {
+        const response = await db.listDocuments(
+          "67a8e81100361d527692", // Database ID
+          "67a900dc003e3b7524ee"  // Users Collection ID
+        );
+  
+        const allUsers = response.documents;
+        const banned = allUsers.filter((user) => user.banned);
+        const active = allUsers.filter((user) => !user.banned);
+  
+        setUsers(active);
+        setBannedUsers(banned);
+      } catch (error) {
+        console.error("🚨 Error fetching users:", error);
+      } finally {
+        setIsLoadingUsers(false);
+      }
+    }
+  
+    fetchUsers();
     checkAdmin();
   }, []);
+
+  async function toggleBan(user) {
+    const newStatus = !user.banned;
+  
+    try {
+      await db.updateDocument(
+        "67a8e81100361d527692", // Database ID
+        "67a900dc003e3b7524ee", // Users Collection ID
+        user.$id,
+        { banned: newStatus }
+      );
+  
+      toast.success(`✅ User ${newStatus ? "banned" : "unbanned"} successfully!`);
+  
+      // Update local state
+      setUsers((prev) => prev.filter((u) => u.$id !== user.$id));
+      setBannedUsers((prev) => newStatus ? [...prev, user] : prev.filter((u) => u.$id !== user.$id));
+    } catch (error) {
+      console.error("🚨 Error updating user ban status:", error);
+      toast.error("❌ Failed to update user ban status.");
+    }
+  }  
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -179,6 +225,59 @@ export default function AdminPanel() {
             🚀 Submit Article
           </motion.button>
         </motion.form>
+        <motion.div
+  className="bg-white p-6 rounded-lg shadow-lg border mt-8"
+  initial={{ opacity: 0, y: -10 }}
+  animate={{ opacity: 1, y: 0 }}
+>
+  <h2 className="text-2xl font-bold text-black">🛑 Manage Users</h2>
+
+  {isLoadingUsers ? (
+    <p className="text-gray-500">Loading users...</p>
+  ) : (
+    <div className="mt-4 space-y-4">
+      {users.length === 0 && <p className="text-gray-500">No active users found.</p>}
+
+      {users.map((user) => (
+        <div key={user.$id} className="flex justify-between items-center p-4 border rounded-lg shadow">
+          <div>
+            <p className="font-semibold text-black">{user.username}</p>
+            <p className="text-sm text-gray-500">UUID: {user.uuid}</p>
+          </div>
+          <button
+            onClick={() => toggleBan(user)}
+            className="px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
+          >
+            Ban
+          </button>
+        </div>
+      ))}
+    </div>
+  )}
+
+  {/* Banned Users Section */}
+  <h2 className="text-2xl font-bold text-red-600 mt-6">🚫 Banned Users</h2>
+  <div className="mt-4 space-y-4">
+    {bannedUsers.length === 0 ? (
+      <p className="text-gray-500">No banned users.</p>
+    ) : (
+      bannedUsers.map((user) => (
+        <div key={user.$id} className="flex justify-between items-center p-4 border rounded-lg shadow bg-red-50">
+          <div>
+            <p className="font-semibold text-black">{user.username}</p>
+            <p className="text-sm text-gray-500">UUID: {user.uuid}</p>
+          </div>
+          <button
+            onClick={() => toggleBan(user)}
+            className="px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600"
+          >
+            Unban
+          </button>
+        </div>
+      ))
+    )}
+  </div>
+</motion.div>
       </motion.div>
     )
   );

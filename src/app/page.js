@@ -55,6 +55,7 @@ export default function Home() {
     fetchListings();
   }, []);
 
+
   if (!isClient) return null; // Prevent hydration error
 
   // ✅ Format price (e.g., 100000 -> 100.000€)
@@ -148,7 +149,7 @@ export default function Home() {
 
                     {/* Property Info */}
                     <div className="p-4">
-                      <h3 className="text-lg font-semibold">{listing.title}</h3>
+                      <h3 className="text-lg font-semibold text-black">{listing.title}</h3>
                       <p className="text-gray-500">
                         {listing.description.substring(0, 50)}...
                       </p>

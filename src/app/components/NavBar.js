@@ -74,8 +74,15 @@ export default function Navbar() {
   return (
     <nav className="bg-gray-900 text-white p-4 flex justify-between items-center">
       {/* Logo */}
-      <Link href="/" className="text-2xl font-bold hover:text-gray-400 transition">
-        Immobilien
+      <Link href="/" className="hover:opacity-80 transition">
+        <Image
+          src="/logo.png"
+          alt="RigaVault Estate"
+          width={500}
+          height={125}
+          className="h-20 w-auto -my-6"
+          priority
+        />
       </Link>
 
       {/* 🔍 Search Bar (Fixed) */}

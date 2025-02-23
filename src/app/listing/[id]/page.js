@@ -109,39 +109,45 @@ export default function ListingPage() {
         console.log("🔄 Fetching listing data for ID:", id);
   
         const listingData = await db.getDocument(
-          "67a8e81100361d527692", // Your DB ID
-          "67b2fdc20027f4d55440", // Your Collection ID
+          "67a8e81100361d527692",
+          "67b2fdc20027f4d55440",
           id
         );
+  
+        // Set default Available to true if it's not set
+        if (listingData.Available === undefined) {
+          listingData.Available = true;
+        }
   
         console.log("✅ Listing data:", listingData);
         setListing(listingData);
   
-        // ✅ Fetch images from storage
+        // Only set image URLs if they exist
         if (listingData.imageUrls && listingData.imageUrls.length > 0) {
-          console.log("📸 Fetching image URLs for:", listingData.imageUrls);
-  
+          console.log("📸 Setting image URLs:", listingData.imageUrls);
           setImageUrls(listingData.imageUrls);
-          setCurrentImage(listingData.imageUrls[0]); // ✅ Set first image as default
+          setCurrentImage(listingData.imageUrls[0]);
+        } else {
+          // Set default image
+          setImageUrls(['/example.jpg']);
+          setCurrentImage('/example.jpg');
         }
   
-        // ✅ Fetch seller data
-        console.log("🔄 Fetching seller data for UUID:", listingData.sellerUUID);
+        // Fetch seller data
+        if (listingData.sellerUUID) {
+          console.log("🔄 Fetching seller data for UUID:", listingData.sellerUUID);
+          const sellerResponse = await db.listDocuments(
+            "67a8e81100361d527692",
+            "67a900dc003e3b7524ee",
+            [Query.equal("uuid", listingData.sellerUUID)]
+          );
   
-        const sellerResponse = await db.listDocuments(
-          "67a8e81100361d527692",
-          "67a900dc003e3b7524ee",
-          [Query.equal("uuid", listingData.sellerUUID)]
-        );
-  
-        if (sellerResponse.documents.length === 0) {
-          console.error("❌ Seller UUID not found in database!");
-          return;
+          if (sellerResponse.documents.length > 0) {
+            const sellerData = sellerResponse.documents[0];
+            console.log("✅ Seller data:", sellerData);
+            setSeller(sellerData);
+          }
         }
-        
-        const sellerData = sellerResponse.documents[0];
-        console.log("✅ Seller data:", sellerData);
-        setSeller(sellerData);
       } catch (error) {
         console.error("🚨 Error fetching listing:", error);
       } finally {
@@ -166,6 +172,34 @@ export default function ListingPage() {
     fetchData();
     fetchReviews();
     fetchUser();
+
+    // Set up real-time listener for listing updates
+    const unsubscribe = client.subscribe(
+      `databases.67a8e81100361d527692.collections.67b2fdc20027f4d55440.documents.${id}`,
+      response => {
+        console.log("📩 Received listing update:", response);
+        console.log("Available status:", response.payload.Available); // Debug log
+
+        if (response.events.includes(`databases.*.collections.*.documents.${id}.update`)) {
+          // Update the listing state with new data
+          setListing(prevListing => ({
+            ...prevListing,
+            ...response.payload,
+            Available: response.payload.Available ?? true // Ensure Available is boolean
+          }));
+          
+          // If listing becomes unavailable, show a toast
+          if (response.payload.Available === false) {
+            toast.info("This listing is no longer available!");
+          }
+        }
+      }
+    );
+
+    // Cleanup subscription on unmount
+    return () => {
+      unsubscribe();
+    };
   }, [id]);
 
   const isTrusted = seller ? verifiedSellers.includes(seller.uuid) : false;
@@ -227,62 +261,119 @@ export default function ListingPage() {
     }
   }  
 
-  async function handlePurchase() {
-    if (!user || !user.uuid) {
-      toast.error("⚠ You need to be logged in to make a purchase.");
+  const handlePurchase = async () => {
+    if (!user) {
+      toast.error("Please login to make a purchase");
       return;
     }
-  
-    if (user.uuid === listing.sellerUUID) {
-      toast.error("❌ You cannot buy your own listing!");
-      return;
-    }
-  
-    setShowPurchasePopup(true);
-    setPurchaseStep("Authenticating request...");
-  
+
     try {
-      // ✅ Fetch buyer's account balance
-      const buyerAccountResponse = await db.listDocuments("67a8e81100361d527692", "67b093040006e14307e1", [
-        Query.equal("user_name", user.username),
-      ]);
-  
+      console.log("Starting purchase process...");
+      
+      // Get buyer's account
+      const buyerAccountResponse = await db.listDocuments(
+        "67a8e81100361d527692",
+        "67b093040006e14307e1",
+        [Query.equal("user_name", user.username)]
+      );
+
       if (buyerAccountResponse.documents.length === 0) {
-        toast.error("❌ Buyer account not found!");
-        setShowPurchasePopup(false);
+        toast.error("Buyer account not found");
         return;
       }
-  
+
       const buyerAccount = buyerAccountResponse.documents[0];
-  
-      if (buyerAccount.balance < listing.price) {
-        toast.error("❌ Insufficient funds! Please top up your account.");
-        setShowPurchasePopup(false);
-        return;
-      }
-  
-      // ✅ Create purchase document
-      const purchaseId = ID.unique();
-      await db.createDocument("67a8e81100361d527692", "67b6049900036a440ded", purchaseId, {
-        shopname: listing.title,
-        seller: seller.username,
-        sellerUUID: seller.uuid,
-        buyerUUID: user.uuid,
-        buyer: user.username,
-        confirmed: false,
-        price: listing.price,
-        productName: listing.title,
-      });
-  
-      setPurchaseStep("Waiting for Bank Confirmation...");
-      listenForPurchaseConfirmation(purchaseId, buyerAccount.$id, seller.uuid);
+
+      // Get Minecraft UUID for seller
+      const uuidResponse = await fetch(`https://rigabank.dyplay.at/api/uuid?uuid=${seller.username}`);
+      const uuidData = await uuidResponse.json();
+      const sellerMinecraftUUID = uuidData.uuid;
+
+      // Create purchase request in the purchase requests collection
+      const purchaseRequest = await db.createDocument(
+        "67a8e81100361d527692",
+        "67b6049900036a440ded",  // Purchase requests collection
+        ID.unique(),
+        {
+          shopname: listing.title,
+          seller: seller.username,
+          sellerUUID: sellerMinecraftUUID,
+          buyerUUID: user.uuid,
+          buyer: user.username,
+          confirmed: false,
+          price: listing.price,
+          productName: listing.title
+        }
+      );
+
+      // Update listing availability
+      await db.updateDocument(
+        "67a8e81100361d527692",
+        "67b2fdc20027f4d55440",
+        listing.$id,
+        {
+          Available: false
+        }
+      );
+
+      // Start listening for purchase confirmation
+      listenForPurchaseConfirmation(purchaseRequest.$id, buyerAccount.$id, seller.username, listing.$id);
+
+      setShowPurchasePopup(true);
+      toast.success("Purchase initiated!");
+
     } catch (error) {
-      console.error("🚨 Error processing purchase:", error);
-      toast.error("❌ Failed to process purchase.");
-      setShowPurchasePopup(false);
+      console.error("Error initiating purchase:", error);
+      toast.error("Failed to initiate purchase");
     }
-  }  
-  
+  };
+
+  async function listenForPurchaseConfirmation(purchaseId, buyerAccountId, sellerUsername, listingId) {
+    console.log(`🔄 Listening for purchase confirmation for ID: ${purchaseId}`);
+
+    const unsubscribe = client.subscribe(
+      `databases.67a8e81100361d527692.collections.67b6049900036a440ded.documents.${purchaseId}`,
+      async (response) => {
+        console.log("📩 Received real-time update:", response);
+
+        if (response.events.includes(`databases.*.collections.*.documents.${purchaseId}.update`)) {
+          try {
+            // Set confirmed to true in purchase request
+            await db.updateDocument(
+              "67a8e81100361d527692",
+              "67b6049900036a440ded",
+              purchaseId,
+              {
+                confirmed: true
+              }
+            );
+
+            // Update listing availability
+            await db.updateDocument(
+              "67a8e81100361d527692",
+              "67b2fdc20027f4d55440",
+              listingId,
+              {
+                Available: false
+              }
+            );
+
+            toast.success("✅ Purchase completed successfully!");
+            setShowPurchasePopup(false);
+            
+            window.location.href = `/receipt/${purchaseId}`;
+
+          } catch (error) {
+            console.error("🚨 Error updating documents:", error);
+            toast.error("❌ Failed to complete purchase.");
+          }
+        }
+      }
+    );
+
+    return unsubscribe;
+  }
+
   // ✅ Move `submitReview` OUTSIDE `useEffect`
   async function submitReview() {
     if (!user || !user.uuid) {
@@ -332,86 +423,6 @@ export default function ListingPage() {
       toast.error("❌ Failed to submit review.");
     }
   }
-
-  async function listenForPurchaseConfirmation(purchaseId, buyerUsername, sellerUsername) {
-    console.log(`🔄 Listening for purchase confirmation for ID: ${purchaseId}`);
-  
-    const unsubscribe = client.subscribe(
-      `databases.67a8e81100361d527692.collections.67b6049900036a440ded.documents.${purchaseId}`,
-      async (response) => {
-        console.log("📩 Received real-time update:", response);
-  
-        if (response.events.includes(`databases.*.collections.*.documents.${purchaseId}.update`)) {
-          if (response.payload.confirmed) {
-            console.log("✅ Purchase confirmed!");
-  
-            try {
-              // ✅ Fetch Buyer's Account (Using `user_name`)
-              const buyerAccountResponse = await db.listDocuments(
-                "67a8e81100361d527692",
-                "67b093040006e14307e1",
-                [Query.equal("user_name", buyerUsername)] // ✅ Changed `user_uuid` → `user_name`
-              );
-  
-              if (buyerAccountResponse.documents.length === 0) {
-                console.error("❌ Buyer account not found!");
-                return;
-              }
-  
-              const buyerAccount = buyerAccountResponse.documents[0];
-  
-              // ✅ Fetch Seller's Account (Using `user_name`)
-              const sellerAccountResponse = await db.listDocuments(
-                "67a8e81100361d527692",
-                "67b093040006e14307e1",
-                [Query.contains("user_name", buyerUsername)] // ✅ Changed `user_uuid` → `user_name`
-              );
-  
-              if (sellerAccountResponse.documents.length === 0) {
-                console.error("❌ Seller account not found!");
-                return;
-              }
-  
-              const sellerAccount = sellerAccountResponse.documents[0];
-  
-              // ✅ Deduct money from the buyer
-              if (buyerAccount.balance < response.payload.price) {
-                console.error("❌ Insufficient funds, transaction aborted.");
-                toast.error("❌ Insufficient funds, transaction aborted.");
-                return;
-              }
-  
-              await db.updateDocument("67a8e81100361d527692", "67b093040006e14307e1", buyerAccount.$id, {
-                balance: buyerAccount.balance - response.payload.price, // ✅ Deducted correctly
-              });
-  
-              // ✅ Add money to the seller
-              await db.updateDocument("67a8e81100361d527692", "67b093040006e14307e1", sellerAccount.$id, {
-                balance: sellerAccount.balance + response.payload.price,
-              });
-  
-              // ✅ Mark listing as sold
-              await db.updateDocument("67a8e81100361d527692", "67b2fdc20027f4d55440", response.payload.listingId, {
-                available: false,
-              });
-  
-              // ✅ Redirect to receipt page
-              setPurchaseStep("✅ Purchase Confirmed! Redirecting to receipt...");
-              setTimeout(() => {
-                setShowPurchasePopup(false);
-                window.location.href = `/receipt/${purchaseId}`;
-              }, 3000);
-            } catch (error) {
-              console.error("🚨 Error updating balances:", error);
-              toast.error("❌ Failed to transfer funds.");
-            }
-          }
-        }
-      }
-    );
-  
-    return unsubscribe;
-  }  
 
   if (loading) return <Skeleton />;
   if (!listing) return <p>Listing not found.</p>;
@@ -474,29 +485,33 @@ export default function ListingPage() {
     <div className="lg:w-2/3">
       {/* Main Image Display */}
       <div className="relative">
-        <Image
+        {currentImage && (
+          <Image
             src={currentImage}
             alt="Main Listing Image"
             width={1000}
             height={600}
             className="rounded-lg shadow-lg object-cover w-full h-[50vh] md:h-[60vh] lg:h-[515px]"
           />
+        )}
       </div>
   
       {/* Thumbnail Navigation */}
       <div className="mt-4 flex justify-center gap-2 overflow-x-auto">
         {imageUrls.map((url, index) => (
-          <Image
-          key={index}
-          src={url}
-          width={120}  // Adjusted for consistency
-          height={80}  // Adjusted to match aspect ratio
-          alt={`Thumbnail ${index + 1}`}
-          className={`cursor-pointer rounded-lg shadow-md transition ${
-            currentImage === url ? "border-4 border-blue-500" : "opacity-75"
-          } object-cover w-[120px] h-[80px]`} // ✅ Maintain aspect ratio
-          onClick={() => setCurrentImage(url)}
-        />        
+          url && (
+            <Image
+              key={index}
+              src={url}
+              width={120}
+              height={80}
+              alt={`Thumbnail ${index + 1}`}
+              className={`cursor-pointer rounded-lg shadow-md transition ${
+                currentImage === url ? "border-4 border-blue-500" : "opacity-75"
+              } object-cover w-[120px] h-[80px]`}
+              onClick={() => setCurrentImage(url)}
+            />
+          )
         ))}
       </div>
     </div>
@@ -512,7 +527,7 @@ export default function ListingPage() {
   <h1 className="text-3xl font-bold text-black">{listing.title}</h1>
   <p className="mt-2 text-gray-600">{listing.description}</p>
   <p className="mt-2 text-gray-600 flex items-center">
-    Country Location: {listing.country}
+    State Location: {listing.country}
     {countryFlags[listing.country] && (
       <Image
         src={countryFlags[listing.country]}
@@ -530,23 +545,38 @@ export default function ListingPage() {
   {/* 🔹 Availability Status */}
   <div
     className={`mt-4 p-3 rounded-lg text-center font-semibold text-white ${
-      listing.available ? "bg-red-500" : "bg-green-500"
+      !listing?.Available ? "bg-green-500" : "bg-red-400"
     }`}
   >
-    {listing.available ? "❌ Not Available" : "✅ Available"}
+    {!listing?.Available ? "✅ Available" : "❌ Not Available"}
   </div>
 
-  {/* 🔹 Buy Button (Disabled if not available) */}
+  {/* 🔹 Owner Notice (if it's your listing) */}
+  {user?.uuid === listing?.sellerUUID && (
+    <div className="mt-2 p-2 bg-yellow-100 text-yellow-800 rounded text-center">
+      This is your listing
+    </div>
+  )}
+
+  {/* 🔹 Buy Button */}
   <button
     className={`w-full mt-4 py-3 rounded-lg text-white font-bold transition ${
-      listing.available || !user || user.uuid === listing.sellerUUID
+      listing?.Available || !user || user?.uuid === listing?.sellerUUID
         ? "bg-gray-400 cursor-not-allowed"
         : "bg-blue-500 hover:bg-blue-600"
     }`}
-    disabled={listing.available || !user} // ✅ Disable if user not loaded
+    disabled={listing?.Available || !user || user?.uuid === listing?.sellerUUID}
     onClick={handlePurchase}
   >
-    {user ? "Buy Now" : <div className="w-7 h-7 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto"></div>} 
+    {!user ? (
+      "Please login to purchase"
+    ) : user?.uuid === listing?.sellerUUID ? (
+      "This is your listing"
+    ) : listing?.Available ? (
+      "Not Available"
+    ) : (
+      "Buy Now"
+    )}
   </button>
 
   {/* 🔹 Seller Information */}

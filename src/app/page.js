@@ -5,8 +5,10 @@ import { useEffect, useState } from "react";
 import { db, Query } from "../../lib/appwrite";
 import Image from "next/image";
 import { motion } from "framer-motion";
-import { FaSearch, FaArrowRight } from "react-icons/fa";
+import { FaSearch, FaArrowRight, FaCheckCircle } from "react-icons/fa";
 import { useRouter } from "next/navigation";
+import { useTrustedSellers } from "./components/TrustedSellersProvider";
+import { Tooltip } from "react-tooltip";
 
 export default function Home() {
   const [listings, setListings] = useState([]);
@@ -14,6 +16,7 @@ export default function Home() {
   const [isClient, setIsClient] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const router = useRouter();
+  const verifiedSellers = useTrustedSellers();
 
   useEffect(() => {
     setIsClient(true);
@@ -58,9 +61,9 @@ export default function Home() {
 
   if (!isClient) return null; // Prevent hydration error
 
-  // ✅ Format price (e.g., 100000 -> 100.000€)
+  // ✅ Format price (remove the € since toLocaleString already adds it)
   const formatPrice = (price) => {
-    return price.toLocaleString("de-DE") + "€";
+    return price.toLocaleString("de-DE");
   };
 
   // ✅ Handle search submission
@@ -154,8 +157,7 @@ export default function Home() {
                         {listing.description.substring(0, 50)}...
                       </p>
                       <p className="text-blue-600 font-bold mt-2">
-                        {formatPrice(listing.price)}€ (
-                        {listing.type === "buy" ? "Selling Price" : "Rent Price"})
+                        {formatPrice(listing.price)}€
                       </p>
 
                       {/* ✅ Seller Info (Minecraft Head + Name) */}
@@ -168,9 +170,22 @@ export default function Home() {
                             alt="Seller Head"
                             className="rounded-md"
                           />
-                          <span className="ml-2 font-medium text-gray-700">
-                            {sellers[listing.sellerUUID].username}
-                          </span>
+                          <div className="ml-2 flex items-center">
+                            <span className="font-medium text-gray-700">
+                              {sellers[listing.sellerUUID].username}
+                            </span>
+                            {verifiedSellers.includes(listing.sellerUUID) && (
+                              <>
+                                <FaCheckCircle 
+                                  className="ml-1 text-blue-500" 
+                                  data-tooltip-id={`verified-${listing.$id}`}
+                                />
+                                <Tooltip id={`verified-${listing.$id}`}>
+                                  Verified Seller
+                                </Tooltip>
+                              </>
+                            )}
+                          </div>
                         </div>
                       ) : (
                         <div className="flex items-center mt-4">

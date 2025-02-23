@@ -39,6 +39,7 @@ export default function Dashboard() {
     type: "buy",
     imageUrls: [],
   });
+  const [purchases, setPurchases] = useState([]);
 
   const router = useRouter();
   const bucketId = "67b2fe15002b214adfba";
@@ -71,8 +72,20 @@ export default function Dashboard() {
           Query.equal("sellerUUID", userData.uuid),
         ]);
         setListings(listingsResponse.documents);
+
+        // Fetch user's purchases
+        const purchasesResponse = await db.listDocuments(
+          "67a8e81100361d527692",
+          "67b6049900036a440ded",
+          [
+            Query.equal("buyer", userData.username),
+            Query.equal("confirmed", true)
+          ]
+        );
+        setPurchases(purchasesResponse.documents);
+
       } catch (error) {
-        console.error("🚨 Error fetching user data:", error);
+        console.error("🚨 Error fetching data:", error);
       } finally {
         setLoading(false);
       }
@@ -509,6 +522,65 @@ const removeImage = (index) => {
           ))
         ) : (
           <p className="text-gray-400 mt-4">No active listings yet.</p>
+        )}
+      </div>
+
+      {/* Purchased Properties Section */}
+      <h2 className="text-3xl font-bold mt-12">Your Purchased Properties</h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6 w-full max-w-7xl">
+        {purchases.length > 0 ? (
+          purchases.map((purchase) => (
+            <div key={purchase.$id} className="bg-gray-800 p-6 rounded-lg shadow-lg">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-xl font-semibold">{purchase.shopname}</h3>
+                <span className="bg-green-500 text-white px-3 py-1 rounded-full text-sm">
+                  Confirmed
+                </span>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-gray-300">
+                  <span className="font-semibold">Seller:</span> {purchase.seller}
+                </p>
+                <p className="text-gray-300">
+                  <span className="font-semibold">Price:</span> {purchase.price}€
+                </p>
+                <p className="text-gray-300">
+                  <span className="font-semibold">Purchase Date:</span>{" "}
+                  {new Date(purchase.$createdAt).toLocaleDateString()}
+                </p>
+              </div>
+
+              {/* Receipt/Details Button */}
+              <Link 
+                href={`/receipt/${purchase.$id}`}
+                className="mt-4 bg-blue-500 text-white px-4 py-2 rounded block text-center hover:bg-blue-600 transition"
+              >
+                View Receipt
+              </Link>
+
+              {/* Seller Contact Info */}
+              <div className="mt-4 p-4 bg-gray-700 rounded">
+                <h4 className="font-semibold mb-2">Seller Contact</h4>
+                <p className="text-sm text-gray-300">
+                  Minecraft Username: {purchase.seller}
+                </p>
+                <p className="text-sm text-gray-300">
+                  UUID: {purchase.sellerUUID}
+                </p>
+              </div>
+            </div>
+          ))
+        ) : (
+          <div className="col-span-full text-center text-gray-400">
+            <p>You haven't purchased any properties yet.</p>
+            <Link 
+              href="/listings" 
+              className="text-blue-400 hover:text-blue-300 mt-2 inline-block"
+            >
+              Browse Available Properties
+            </Link>
+          </div>
         )}
       </div>
     </div>

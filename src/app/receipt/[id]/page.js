@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { db } from "../../../../lib/appwrite";
-import { PDFDownloadLink, Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
+import { PDFDownloadLink, Document, Page, Text, View, StyleSheet, Image } from "@react-pdf/renderer";
 import { toast } from "react-toastify";
 
 export default function ReceiptPage() {
@@ -64,63 +64,143 @@ export default function ReceiptPage() {
   );
 }
 
-// 🔹 PDF Receipt Document
+// 🎨 Enhanced PDF Styles
 const styles = StyleSheet.create({
   page: {
     padding: 30,
-    fontSize: 12,
-    fontFamily: "Helvetica",
-    backgroundColor: "#f8f8f8",
+    backgroundColor: "#ffffff",
   },
-  section: {
-    marginBottom: 10,
-    padding: 10,
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 40,
+    borderBottom: '1 solid #e0e0e0',
+    paddingBottom: 20,
+    alignItems: 'center',
+  },
+  logo: {
+    width: 200,
+    height: 50,
+    objectFit: 'contain',
+  },
+  headerRight: {
+    textAlign: 'right',
   },
   title: {
     fontSize: 24,
-    fontWeight: "bold",
-    marginBottom: 10,
-    textAlign: "center",
+    fontWeight: 'bold',
+    marginBottom: 20,
+    color: '#2563eb', // Blue color
+    textAlign: 'center',
   },
-  text: {
-    fontSize: 14,
-    marginBottom: 5,
+  section: {
+    margin: 10,
+    padding: 20,
+    backgroundColor: '#f8fafc',
+    borderRadius: 5,
+  },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    borderBottom: '1 solid #e5e7eb',
+  },
+  label: {
+    fontSize: 12,
+    color: '#64748b',
+    width: '30%',
+  },
+  value: {
+    fontSize: 12,
+    color: '#1e293b',
+    width: '70%',
+    textAlign: 'right',
   },
   footer: {
-    position: "absolute",
+    position: 'absolute',
     bottom: 30,
     left: 30,
     right: 30,
+    textAlign: 'center',
+    color: '#94a3b8',
     fontSize: 10,
-    textAlign: "center",
-    color: "gray",
+    borderTop: '1 solid #e0e0e0',
+    paddingTop: 20,
+  },
+  validationCode: {
+    backgroundColor: '#f1f5f9',
+    padding: 15,
+    marginTop: 30,
+    borderRadius: 5,
+    textAlign: 'center',
+  },
+  status: {
+    color: '#059669', // Green color
+    fontSize: 14,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginTop: 10,
   }
 });
 
-const ReceiptPDF = ({ purchase, receiptCode }) => (
+const ReceiptPDF = ({ purchase }) => (
   <Document>
     <Page size="A4" style={styles.page}>
+      {/* Header with Logo */}
+      <View style={styles.header}>
+        <Image
+          src="/logo_black.png"  // Using the same logo as navbar
+          style={styles.logo}
+        />
+        <View style={styles.headerRight}>
+          <Text style={{ fontSize: 10, color: '#64748b' }}>Receipt #{purchase.$id}</Text>
+          <Text style={{ fontSize: 10, color: '#64748b' }}>
+            {new Date(purchase.$createdAt).toLocaleDateString()}
+          </Text>
+        </View>
+      </View>
+
+      {/* Title */}
+      <Text style={styles.title}>Purchase Receipt</Text>
+
+      {/* Main Content */}
       <View style={styles.section}>
-        <Text style={styles.title}>Purchase Receipt</Text>
-        <Text style={styles.text}>Receipt ID: {purchase.$id}</Text>
-        <Text style={styles.text}>Shop Name: {purchase.shopname}</Text>
-        <Text style={styles.text}>Product: {purchase.productName}</Text>
-        <Text style={styles.text}>Seller: {purchase.seller}</Text>
-        <Text style={styles.text}>Buyer: {purchase.buyer}</Text>
-        <Text style={styles.text}>Price: {purchase.price}€</Text>
-        <Text style={styles.text}>Status: ✅ Completed</Text>
+        <View style={styles.row}>
+          <Text style={styles.label}>Shop Name</Text>
+          <Text style={styles.value}>{purchase.shopname}</Text>
+        </View>
+        <View style={styles.row}>
+          <Text style={styles.label}>Product</Text>
+          <Text style={styles.value}>{purchase.productName}</Text>
+        </View>
+        <View style={styles.row}>
+          <Text style={styles.label}>Seller</Text>
+          <Text style={styles.value}>{purchase.seller}</Text>
+        </View>
+        <View style={styles.row}>
+          <Text style={styles.label}>Buyer</Text>
+          <Text style={styles.value}>{purchase.buyer}</Text>
+        </View>
+        <View style={styles.row}>
+          <Text style={styles.label}>Price</Text>
+          <Text style={styles.value}>{purchase.price}€</Text>
+        </View>
       </View>
 
-      <View>
-        <Text style={styles.title}>Payment Details</Text>
-        <Text style={styles.text}>Payment Method: Riga International Bank Inc.</Text>
-        <Text style={styles.text}>Transaction ID: {purchase.$id}</Text>
+      {/* Status */}
+      <Text style={styles.status}>✅ Transaction Complete</Text>
+
+      {/* Validation Code */}
+      <View style={styles.validationCode}>
+        <Text style={{ fontSize: 10, color: '#64748b' }}>Validation Code</Text>
+        <Text style={{ fontSize: 12, marginTop: 5 }}>{purchase.$id}</Text>
       </View>
 
-      {/* 🔹 Validation Code at the Bottom */}
+      {/* Footer */}
       <View style={styles.footer}>
-        <Text>Unique Validation Code: {receiptCode || "Pending..."}</Text>
-        <Text>Generated on: {new Date().toLocaleDateString()}</Text>
+        <Text>Generated on {new Date().toLocaleDateString()}</Text>
+        <Text style={{ marginTop: 5 }}>RigaBank International Real Estate</Text>
+        <Text style={{ marginTop: 5 }}>Thank you for your business!</Text>
       </View>
     </Page>
   </Document>

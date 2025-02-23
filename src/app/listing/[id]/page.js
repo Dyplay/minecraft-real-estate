@@ -185,11 +185,11 @@ export default function ListingPage() {
           setListing(prevListing => ({
             ...prevListing,
             ...response.payload,
-            Available: response.payload.Available ?? true // Ensure Available is boolean
+            Available: response.payload.Available ?? false // Ensure Available is boolean
           }));
           
           // If listing becomes unavailable, show a toast
-          if (response.payload.Available === false) {
+          if (response.payload.Available === true) {
             toast.info("This listing is no longer available!");
           }
         }

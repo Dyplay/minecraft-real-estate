@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
 import { useRouter } from "next/navigation";
 import { db } from "../../../../lib/appwrite";
 import { PDFDownloadLink, Document, Page, Text, View, StyleSheet, Image } from "@react-pdf/renderer";
@@ -8,29 +9,36 @@ import { toast } from "react-toastify";
 
 export default function ReceiptPage() {
   const router = useRouter();
-  const { id } = router.query; // Get the ID from the URL
+  const params = useParams(); // Use useParams to get route parameters
+  const id = params.id; // Access id from params
   const [receipt, setReceipt] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (id) {
-      const fetchReceipt = async () => {
-        try {
-          const receiptData = await db.getDocument(
-            "67a8e81100361d527692", // Database ID
-            "67b6049900036a440ded", // Collection ID
-            id // Use the ID from the URL
-          );
-          setReceipt(receiptData);
-        } catch (error) {
-          console.error("Error fetching receipt:", error);
-        } finally {
-          setLoading(false);
-        }
-      };
-
-      fetchReceipt();
+    async function fetchPurchaseDetails() {
+      if (!id) {
+        setLoading(false);
+        return;
+      }
+      
+      try {
+        console.log("Fetching receipt with ID:", id);
+        const receiptData = await db.getDocument(
+          "67a8e81100361d527692", // Database ID
+          "67b6049900036a440ded", // Collection ID
+          id // Use the ID from the URL params
+        );
+        console.log("Receipt data:", receiptData);
+        setReceipt(receiptData);
+      } catch (error) {
+        console.error("Error fetching receipt:", error);
+        toast.error("Failed to fetch receipt details");
+      } finally {
+        setLoading(false);
+      }
     }
+
+    fetchPurchaseDetails();
   }, [id]);
 
   if (loading) return <p className="text-center text-gray-400">Loading receipt...</p>;

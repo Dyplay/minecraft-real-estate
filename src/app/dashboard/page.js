@@ -275,7 +275,7 @@ const removeImage = (index) => {
     const newFiles = Array.from(e.target.files);
   
     setImageFiles((prevFiles) => {
-      const allFiles = [...prevFiles, ...newFiles].slice(0, 5); // ✅ Append new files, keep max 5
+      const allFiles = [...prevFiles, ...newFiles].slice(0, 10); // ✅ Append new files, keep max 5
       return allFiles;
     });
   };   
@@ -439,7 +439,7 @@ const removeImage = (index) => {
       accept="image/*" 
       onChange={handleFileChange} 
     />
-    <p className="text-sm text-gray-400 mt-1">Max 5 images allowed</p>
+    <p className="text-sm text-gray-400 mt-1">Max 10 images allowed</p>
 
   {/* Image Preview Section */}
   <div className="grid grid-cols-6 gap-1 mt-3">

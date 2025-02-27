@@ -2,6 +2,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Navbar from "./components/NavBar";
 import TrustedSellersProvider from "./components/TrustedSellersProvider"; // ✅ Import
+import BanCheckWrapper from './components/BanCheckWrapper';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -14,13 +15,14 @@ const geistMono = Geist_Mono({
 });
 
 export default function RootLayout({ children }) {
-
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <TrustedSellersProvider> {/* ✅ Wrap inside Provider */}
           <Navbar />
-          {children}
+          <BanCheckWrapper>
+            {children}
+          </BanCheckWrapper>
         </TrustedSellersProvider>
       </body>
     </html>

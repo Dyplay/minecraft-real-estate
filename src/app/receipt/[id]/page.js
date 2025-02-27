@@ -1,43 +1,40 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useRouter } from "next/router";
 import { db } from "../../../../lib/appwrite";
 import { PDFDownloadLink, Document, Page, Text, View, StyleSheet, Image } from "@react-pdf/renderer";
 import { toast } from "react-toastify";
 
 export default function ReceiptPage() {
-  const { id } = useParams(); // ✅ Get the purchase ID from URL params
-  const [purchase, setPurchase] = useState(null);
+  const router = useRouter();
+  const { id } = router.query; // Get the ID from the URL
+  const [receipt, setReceipt] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function fetchPurchaseDetails() {
-      try {
-        const purchaseData = await db.getDocument(
-          "67a8e81100361d527692",
-          "67b6049900036a440ded",
-          id
-        );
-
-        if (!purchaseData.confirmed) {
-          toast.error("🚨 Purchase not confirmed yet!");
-          return;
+    if (id) {
+      const fetchReceipt = async () => {
+        try {
+          const receiptData = await db.getDocument(
+            "67a8e81100361d527692", // Database ID
+            "67b6049900036a440ded", // Collection ID
+            id // Use the ID from the URL
+          );
+          setReceipt(receiptData);
+        } catch (error) {
+          console.error("Error fetching receipt:", error);
+        } finally {
+          setLoading(false);
         }
+      };
 
-        setPurchase(purchaseData);
-      } catch (error) {
-        toast.error("🚨 Error fetching purchase details:", error);
-      } finally {
-        setLoading(false);
-      }
+      fetchReceipt();
     }
-
-    fetchPurchaseDetails();
   }, [id]);
 
   if (loading) return <p className="text-center text-gray-400">Loading receipt...</p>;
-  if (!purchase) return <p className="text-center text-red-500">Invalid receipt.</p>;
+  if (!receipt) return <p className="text-center text-red-500">Receipt not found.</p>;
 
   return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center p-6">
@@ -45,16 +42,16 @@ export default function ReceiptPage() {
 
       <div className="bg-white text-black p-6 rounded-lg shadow-md w-full max-w-lg">
         <p className="text-lg"><strong>Receipt ID:</strong> {id}</p>
-        <p className="text-lg"><strong>Shop Name:</strong> {purchase.shopname}</p>
-        <p className="text-lg"><strong>Product:</strong> {purchase.productName}</p>
-        <p className="text-lg"><strong>Seller:</strong> {purchase.seller}</p>
-        <p className="text-lg"><strong>Buyer:</strong> {purchase.buyer}</p>
-        <p className="text-lg"><strong>Price:</strong> {purchase.price}€</p>
+        <p className="text-lg"><strong>Shop Name:</strong> {receipt.shopname}</p>
+        <p className="text-lg"><strong>Product:</strong> {receipt.productName}</p>
+        <p className="text-lg"><strong>Seller:</strong> {receipt.seller}</p>
+        <p className="text-lg"><strong>Buyer:</strong> {receipt.buyer}</p>
+        <p className="text-lg"><strong>Price:</strong> {receipt.price}€</p>
         <p className="text-lg"><strong>Status:</strong> ✅ Completed</p>
       </div>
 
       <PDFDownloadLink
-        document={<ReceiptPDF purchase={purchase} />}
+        document={<ReceiptPDF receipt={receipt} />}
         fileName={`receipt-${id}.pdf`}
         className="mt-6 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition"
       >
@@ -143,7 +140,7 @@ const styles = StyleSheet.create({
   }
 });
 
-const ReceiptPDF = ({ purchase }) => (
+const ReceiptPDF = ({ receipt }) => (
   <Document>
     <Page size="A4" style={styles.page}>
       {/* Header with Logo */}
@@ -153,9 +150,9 @@ const ReceiptPDF = ({ purchase }) => (
           style={styles.logo}
         />
         <View style={styles.headerRight}>
-          <Text style={{ fontSize: 10, color: '#64748b' }}>Receipt #{purchase.$id}</Text>
+          <Text style={{ fontSize: 10, color: '#64748b' }}>Receipt #{receipt.$id}</Text>
           <Text style={{ fontSize: 10, color: '#64748b' }}>
-            {new Date(purchase.$createdAt).toLocaleDateString()}
+            {new Date(receipt.$createdAt).toLocaleDateString()}
           </Text>
         </View>
       </View>
@@ -167,23 +164,23 @@ const ReceiptPDF = ({ purchase }) => (
       <View style={styles.section}>
         <View style={styles.row}>
           <Text style={styles.label}>Shop Name</Text>
-          <Text style={styles.value}>{purchase.shopname}</Text>
+          <Text style={styles.value}>{receipt.shopname}</Text>
         </View>
         <View style={styles.row}>
           <Text style={styles.label}>Product</Text>
-          <Text style={styles.value}>{purchase.productName}</Text>
+          <Text style={styles.value}>{receipt.productName}</Text>
         </View>
         <View style={styles.row}>
           <Text style={styles.label}>Seller</Text>
-          <Text style={styles.value}>{purchase.seller}</Text>
+          <Text style={styles.value}>{receipt.seller}</Text>
         </View>
         <View style={styles.row}>
           <Text style={styles.label}>Buyer</Text>
-          <Text style={styles.value}>{purchase.buyer}</Text>
+          <Text style={styles.value}>{receipt.buyer}</Text>
         </View>
         <View style={styles.row}>
           <Text style={styles.label}>Price</Text>
-          <Text style={styles.value}>{purchase.price}€</Text>
+          <Text style={styles.value}>{receipt.price}€</Text>
         </View>
       </View>
 
@@ -193,7 +190,7 @@ const ReceiptPDF = ({ purchase }) => (
       {/* Validation Code */}
       <View style={styles.validationCode}>
         <Text style={{ fontSize: 10, color: '#64748b' }}>Validation Code</Text>
-        <Text style={{ fontSize: 12, marginTop: 5 }}>{purchase.$id}</Text>
+        <Text style={{ fontSize: 12, marginTop: 5 }}>{receipt.$id}</Text>
       </View>
 
       {/* Footer */}

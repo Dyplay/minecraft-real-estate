@@ -25,11 +25,13 @@ export default function ListingPage() {
   const [user, setUser] = useState(null); // ✅ Add user state
   const [review, setReview] = useState({ rating: 5, comment: "" });
   const [seller, setSeller] = useState(null); // ✅ Declared FIRST
-  const [showPurchasePopup, setShowPurchasePopup] = useState(false);
-  const [purchaseStep, setPurchaseStep] = useState("Authenticating request...");
+  const [showPurchasePopup, setShowPurchasePopup] = useState(false); // State to control the popup visibility
+  const [purchaseStep, setPurchaseStep] = useState("Starting purchase process..."); // State for the purchase step
   const [loading, setLoading] = useState(true);
   const [imageUrls, setImageUrls] = useState([]); // ✅ Store image URLs
   const [currentImage, setCurrentImage] = useState(null); // ✅ Track selected image
+  const [showSpinner, setShowSpinner] = useState(true); // Added for spinner state
+  const [showPopup, setShowPopup] = useState(false); // State to control the popup visibility
 
   const countryFlags = {
     Riga: "/flags/riga.webp", // Replace with actual flag path
@@ -178,19 +180,32 @@ export default function ListingPage() {
       `databases.67a8e81100361d527692.collections.67b2fdc20027f4d55440.documents.${id}`,
       response => {
         console.log("📩 Received listing update:", response);
-        console.log("Available status:", response.payload.Available); // Debug log
 
         if (response.events.includes(`databases.*.collections.*.documents.${id}.update`)) {
-          // Update the listing state with new data
-          setListing(prevListing => ({
-            ...prevListing,
-            ...response.payload,
-            Available: response.payload.Available ?? false // Ensure Available is boolean
-          }));
-          
-          // If listing becomes unavailable, show a toast
-          if (response.payload.Available === true) {
-            toast.info("This listing is no longer available!");
+          const updatedAvailable = response.payload.Available;
+
+          // Check if the availability status has changed
+          if (updatedAvailable === false) {
+            // Redirect to the receipt page
+            router.push(`/receipt/${response.payload.purchaseId}`); // Assuming you have a purchaseId in the payload
+          } else if (updatedAvailable === true) {
+            // Set Available back to NULL and update the UI
+            setListing(prevListing => ({
+              ...prevListing,
+              ...response.payload,
+              Available: null // Set back to NULL
+            }));
+
+            // Update the UI to show "Payment Declined"
+            toast.error("❌ Payment Declined");
+            setShowSpinner(false); // Assuming you have a state to control the spinner
+          } else {
+            // If it's NULL, set it to true
+            setListing(prevListing => ({
+              ...prevListing,
+              ...response.payload,
+              Available: updatedAvailable === null ? true : updatedAvailable // Set to true if NULL
+            }));
           }
         }
       }
@@ -200,7 +215,7 @@ export default function ListingPage() {
     return () => {
       unsubscribe();
     };
-  }, [id]);
+  }, [id, router]);
 
   const isTrusted = seller ? verifiedSellers.includes(seller.uuid) : false;
   
@@ -267,112 +282,138 @@ export default function ListingPage() {
       return;
     }
 
+    // Show the confirmation popup
+    setShowPurchasePopup(true);
+    setPurchaseStep("Waiting for bank confirmation..."); // Update the step message
+    setIsLoading(true); // Set loading state
+
     try {
       console.log("Starting purchase process...");
-      
-      // Get buyer's account
-      const buyerAccountResponse = await db.listDocuments(
-        "67a8e81100361d527692",
-        "67b093040006e14307e1",
-        [Query.equal("user_name", user.username)]
-      );
 
-      if (buyerAccountResponse.documents.length === 0) {
-        toast.error("Buyer account not found");
-        return;
+      // Check if sellerUUID is available
+      if (!listing.sellerUUID) {
+        toast.error("Seller information is missing. Cannot proceed with the purchase.");
+        setIsLoading(false); // Reset loading state
+        setShowPurchasePopup(false); // Close the popup
+        return; // Exit the function if sellerUUID is missing
       }
 
-      const buyerAccount = buyerAccountResponse.documents[0];
+      console.log("Seller UUID:", listing.sellerUUID); // Log sellerUUID
 
-      // Get Minecraft UUID for seller
-      const uuidResponse = await fetch(`https://rigabank.dyplay.at/api/uuid?uuid=${seller.username}`);
-      const uuidData = await uuidResponse.json();
-      const sellerMinecraftUUID = uuidData.uuid;
-
-      // Create purchase request in the purchase requests collection
+      // Create purchase request in the correct bank purchase requests collection
       const purchaseRequest = await db.createDocument(
-        "67a8e81100361d527692",
-        "67b6049900036a440ded",  // Purchase requests collection
+        "67a8e81100361d527692", // Database ID
+        "67b6049900036a440ded",  // Correct Bank Purchase Requests Collection ID
         ID.unique(),
         {
           shopname: listing.title,
           seller: seller.username,
-          sellerUUID: sellerMinecraftUUID,
           buyerUUID: user.uuid,
           buyer: user.username,
-          confirmed: false,
+          confirmed: false, // Initially set to false
           price: listing.price,
-          productName: listing.title
+          productName: listing.title,
+          sellerUUID: listing.sellerUUID // Ensure sellerUUID is included
         }
       );
 
-      // Update listing availability
-      await db.updateDocument(
-        "67a8e81100361d527692",
-        "67b2fdc20027f4d55440",
-        listing.$id,
-        {
-          Available: false
+      console.log("Purchase request created:", purchaseRequest); // Log the created purchase request
+
+      // Set up the real-time listener for the specific purchase document
+      const unsubscribe = client.subscribe(
+        `databases.67a8e81100361d527692.collections.67b6049900036a440ded.documents.${purchaseRequest.$id}`,
+        async response => {
+          console.log("📩 Received purchase update:", response);
+
+          if (response.events.includes(`databases.*.collections.*.documents.${purchaseRequest.$id}.update`)) {
+            const updatedConfirmed = response.payload.confirmed;
+
+            // Check if the purchase is confirmed
+            if (updatedConfirmed) {
+              // Update the listing's Available attribute to false
+              await db.updateDocument(
+                "67a8e81100361d527692", // Database ID
+                "67b2fdc20027f4d55440", // Listing Collection ID
+                listing.$id, // Use the listing ID
+                { Available: false } // Set Available to false
+              );
+
+              // Log the purchase ID before redirecting
+              console.log("Redirecting to receipt with purchase ID:", purchaseRequest.$id);
+              // Redirect to the receipt page
+              router.push(`/receipt/${purchaseRequest.$id}`); // Ensure this ID is valid
+            } else {
+              // Handle payment declined
+              toast.error("❌ Payment Declined");
+              setPurchaseStep("Payment Declined"); // Update the popup text
+              setIsLoading(false); // Reset loading state
+              setShowPurchasePopup(true); // Keep the popup open
+            }
+          }
         }
       );
 
-      // Start listening for purchase confirmation
-      listenForPurchaseConfirmation(purchaseRequest.$id, buyerAccount.$id, seller.username, listing.$id);
+      console.log("Real-time listener set up for purchase request:", purchaseRequest.$id); // Log listener setup
 
-      setShowPurchasePopup(true);
-      toast.success("Purchase initiated!");
-
+      // Clean up the listener when the component unmounts or loading state changes
+      return () => {
+        unsubscribe();
+        setIsLoading(false); // Reset loading state
+      };
     } catch (error) {
       console.error("Error initiating purchase:", error);
       toast.error("Failed to initiate purchase");
+      setIsLoading(false); // Reset loading state
+      setShowPurchasePopup(false); // Close the popup on error
     }
   };
 
-  async function listenForPurchaseConfirmation(purchaseId, buyerAccountId, sellerUsername, listingId) {
-    console.log(`🔄 Listening for purchase confirmation for ID: ${purchaseId}`);
+  // In your component's useEffect, set up the listener conditionally
+  useEffect(() => {
+    if (isLoading && listing) { // Ensure listing is available
+      // Set up the listener only if the user is in the loading state
+      const unsubscribe = client.subscribe(
+        `databases.67a8e81100361d527692.collections.67b6049900036a440ded.documents.${id}`, // Use the listing ID directly
+        response => {
+          console.log("📩 Received listing update:", response);
 
-    const unsubscribe = client.subscribe(
-      `databases.67a8e81100361d527692.collections.67b6049900036a440ded.documents.${purchaseId}`,
-      async (response) => {
-        console.log("📩 Received real-time update:", response);
+          if (response.events.includes(`databases.*.collections.*.documents.${id}.update`)) {
+            const updatedAvailable = response.payload.Available;
 
-        if (response.events.includes(`databases.*.collections.*.documents.${purchaseId}.update`)) {
-          try {
-            // Set confirmed to true in purchase request
-            await db.updateDocument(
-              "67a8e81100361d527692",
-              "67b6049900036a440ded",
-              purchaseId,
-              {
-                confirmed: true
-              }
-            );
+            // Check if the availability status has changed
+            if (updatedAvailable === false) {
+              // Redirect to the receipt page
+              router.push(`/receipt/${response.payload.purchaseId}`); // Assuming you have a purchaseId in the payload
+            } else if (updatedAvailable === true) {
+              // Set Available back to NULL and update the UI
+              setListing(prevListing => ({
+                ...prevListing,
+                ...response.payload,
+                Available: null // Set back to NULL
+              }));
 
-            // Update listing availability
-            await db.updateDocument(
-              "67a8e81100361d527692",
-              "67b2fdc20027f4d55440",
-              listingId,
-              {
-                Available: false
-              }
-            );
-
-            toast.success("✅ Purchase completed successfully!");
-            setShowPurchasePopup(false);
-            
-            window.location.href = `/receipt/${purchaseId}`;
-
-          } catch (error) {
-            console.error("🚨 Error updating documents:", error);
-            toast.error("❌ Failed to complete purchase.");
+              // Update the UI to show "Payment Declined"
+              toast.error("❌ Payment Declined");
+              setShowPopup(false); // Close the popup
+              setIsLoading(false); // Reset loading state
+            } else {
+              // If it's NULL, set it to true
+              setListing(prevListing => ({
+                ...prevListing,
+                ...response.payload,
+                Available: updatedAvailable === null ? true : updatedAvailable // Set to true if NULL
+              }));
+            }
           }
         }
-      }
-    );
+      );
 
-    return unsubscribe;
-  }
+      // Clean up the listener when loading state changes
+      return () => {
+        unsubscribe();
+      };
+    }
+  }, [isLoading, id]); // Use id directly instead of listing.$id
 
   // ✅ Move `submitReview` OUTSIDE `useEffect`
   async function submitReview() {
@@ -477,7 +518,11 @@ export default function ListingPage() {
         <div className="fixed inset-0 flex justify-center items-center bg-black bg-opacity-50 z-[9999]">
           <div className="bg-white p-6 rounded-lg shadow-lg text-center w-[90%] max-w-md z-[10000]">
             <h2 className="text-xl font-semibold text-black">{purchaseStep}</h2>
-            <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mt-4"></div>
+            {isLoading ? (
+              <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mt-4"></div>
+            ) : (
+              <div className="text-red-500 text-3xl mt-4">❌</div> // X icon for declined
+            )}
           </div>
         </div>
       )}
@@ -545,10 +590,10 @@ export default function ListingPage() {
   {/* 🔹 Availability Status */}
   <div
     className={`mt-4 p-3 rounded-lg text-center font-semibold text-white ${
-      !listing?.Available ? "bg-green-500" : "bg-red-400"
+      listing.Available ? "bg-green-500" : "bg-red-400"
     }`}
   >
-    {!listing?.Available ? "✅ Available" : "❌ Not Available"}
+    {listing.Available ? "✅ Available" : "❌ Not Available"}
   </div>
 
   {/* 🔹 Owner Notice (if it's your listing) */}
@@ -561,18 +606,18 @@ export default function ListingPage() {
   {/* 🔹 Buy Button */}
   <button
     className={`w-full mt-4 py-3 rounded-lg text-white font-bold transition ${
-      listing?.Available || !user || user?.uuid === listing?.sellerUUID
+      !listing.Available || !user || user?.uuid === listing?.sellerUUID
         ? "bg-gray-400 cursor-not-allowed"
         : "bg-blue-500 hover:bg-blue-600"
     }`}
-    disabled={listing?.Available || !user || user?.uuid === listing?.sellerUUID}
+    disabled={!listing.Available || !user || user?.uuid === listing?.sellerUUID}
     onClick={handlePurchase}
   >
     {!user ? (
       "Please login to purchase"
     ) : user?.uuid === listing?.sellerUUID ? (
       "This is your listing"
-    ) : listing?.Available ? (
+    ) : !listing.Available ? (
       "Not Available"
     ) : (
       "Buy Now"

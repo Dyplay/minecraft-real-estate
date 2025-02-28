@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { db, account, Query } from "../../../lib/appwrite";
 import Link from "next/link";
 import Image from "next/image";
-import { FaSearch, FaChevronDown } from "react-icons/fa";
+import { FaSearch, FaChevronDown, FaHome, FaUser, FaSignOutAlt, FaTachometerAlt } from "react-icons/fa";
 
 export default function Navbar() {
   const [user, setUser] = useState(null);
@@ -62,6 +62,7 @@ export default function Navbar() {
           ...userData,
           mcUsername: mcUsername,
           avatar: `https://crafthead.net/helm/${userData.uuid}`,
+          sessionId: session.$id
         });
 
       } catch (error) {
@@ -72,81 +73,113 @@ export default function Navbar() {
   }, []);
 
   return (
-    <nav className="bg-gray-900 text-white p-4 flex justify-between items-center">
-      {/* Logo */}
-      <Link href="/" className="hover:opacity-80 transition">
-        <Image
-          src="/logo.png"
-          alt="RigaVault Estate"
-          width={500}
-          height={125}
-          className="h-20 w-auto -my-6"
-          priority
-        />
-      </Link>
-
-      {/* 🔍 Search Bar (Fixed) */}
-      <div className="relative flex items-center bg-gray-800 rounded-full p-2 shadow-lg">
-        <input
-          type="text"
-          placeholder="Search listings..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              router.push(`/listings?search=${encodeURIComponent(search)}`);
-            }
-          }}
-          className="bg-transparent text-white px-3 outline-none w-64 placeholder-gray-400"
-        />
-        <button
-          onClick={() => router.push(`/listings?search=${encodeURIComponent(search)}`)}
-          className="p-2 hover:bg-gray-700 rounded-full transition"
-        >
-          <FaSearch className="text-white" />
-        </button>
-      </div>
-
-      {/* User Dropdown */}
-      {user ? (
-        <div className="relative">
-          <button
-            onClick={() => setDropdown(!dropdown)}
-            className="flex items-center gap-2 hover:text-gray-400 transition relative z-50"
-          >
-            <Image
-              src={user.avatar || "/example.jpg"}
-              width={32}
-              height={32}
-              alt="User Avatar"
-              className="rounded-md"
-            />
-            <span>{user.mcUsername}</span> 
-            <FaChevronDown />
-          </button>
-
-          {dropdown && (
-            <div className="absolute right-0 mt-2 w-48 bg-white text-black rounded-lg shadow-lg z-50 border border-gray-200">
-              <Link href="/dashboard" className="block px-4 py-2 hover:bg-gray-200 hover:rounded-lg transition">
-                Dashboard
-              </Link>
-              <button
-                onClick={async () => {
-                  await account.deleteSession("current");
-                  window.location.href = "/";
-                }}
-                className="w-full text-left px-4 py-2 hover:bg-gray-200 hover:rounded-lg transition"
-              >
-                Logout
-              </button>
-            </div>
-          )}
-        </div>
-      ) : (
-        <Link href="/login" className="bg-blue-500 px-4 py-2 rounded hover:bg-blue-600 hover:rounded-lg transition">
-          Login
+    <nav className="bg-gray-900 text-white p-4 shadow-lg border-b border-gray-800">
+      <div className="max-w-7xl mx-auto flex justify-between items-center">
+        {/* Logo */}
+        <Link href="/" className="hover:opacity-80 transition flex items-center">
+          <Image
+            src="/logo.png"
+            alt="RigaVault Estate"
+            width={500}
+            height={125}
+            className="h-16 w-auto -my-4"
+            priority
+          />
         </Link>
-      )}
+
+        {/* 🔍 Search Bar */}
+        <div className="relative flex items-center bg-gray-800 rounded-lg p-2 shadow-md border border-gray-700 flex-1 max-w-md mx-6">
+          <input
+            type="text"
+            placeholder="Search listings..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                router.push(`/listings?search=${encodeURIComponent(search)}`);
+              }
+            }}
+            className="bg-transparent text-white px-3 outline-none w-full placeholder-gray-400"
+          />
+          <button
+            onClick={() => router.push(`/listings?search=${encodeURIComponent(search)}`)}
+            className="p-2 bg-orange-500 hover:bg-orange-600 rounded-md transition text-white"
+          >
+            <FaSearch className="text-white" />
+          </button>
+        </div>
+
+        {/* Navigation Links */}
+        <div className="hidden md:flex items-center space-x-6">
+          <Link href="/" className="text-gray-300 hover:text-white hover:underline transition flex items-center">
+            <FaHome className="mr-1" />
+            <span>Home</span>
+          </Link>
+          <Link href="/listings" className="text-gray-300 hover:text-white hover:underline transition">
+            Listings
+          </Link>
+        </div>
+
+        {/* User Dropdown */}
+        {user ? (
+          <div className="relative">
+            <button
+              onClick={() => setDropdown(!dropdown)}
+              className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 px-3 py-2 rounded-lg transition border border-gray-700"
+            >
+              <Image
+                src={user.avatar || "/example.jpg"}
+                width={32}
+                height={32}
+                alt="User Avatar"
+                className="rounded-md"
+              />
+              <span className="hidden sm:inline">{user.mcUsername}</span> 
+              <FaChevronDown className="text-gray-400" />
+            </button>
+
+            {dropdown && (
+              <div className="absolute right-0 mt-2 w-48 bg-gray-800 text-white rounded-lg shadow-lg z-50 border border-gray-700 overflow-hidden">
+                <div className="px-4 py-3 border-b border-gray-700">
+                  <p className="text-sm text-gray-300">Signed in as</p>
+                  <p className="text-sm font-medium truncate">{user.mcUsername}</p>
+                </div>
+                
+                <Link 
+                  href="/dashboard" 
+                  className="flex items-center px-4 py-2 hover:bg-gray-700 transition text-gray-200"
+                >
+                  <FaTachometerAlt className="mr-2 text-orange-500" />
+                  Dashboard
+                </Link>
+                
+                <Link 
+                  href={`/profile/${user?.sessionId}`}
+                  className="flex items-center px-4 py-2 hover:bg-gray-700 transition text-gray-200"
+                >
+                  <FaUser className="mr-2 text-orange-500" />
+                  Profile
+                </Link>
+                
+                <button
+                  onClick={async () => {
+                    await account.deleteSession("current");
+                    window.location.href = "/";
+                  }}
+                  className="w-full text-left flex items-center px-4 py-2 hover:bg-gray-700 transition text-gray-200 border-t border-gray-700"
+                >
+                  <FaSignOutAlt className="mr-2 text-orange-500" />
+                  Logout
+                </button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <Link href="/login" className="bg-orange-500 px-4 py-2 rounded-lg hover:bg-orange-600 transition shadow-md">
+            Login
+          </Link>
+        )}
+      </div>
     </nav>
   );
 }

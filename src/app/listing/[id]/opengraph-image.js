@@ -64,7 +64,7 @@ export default async function Image({ params }) {
           </div>
           {/* Logo will be positioned at bottom left */}
           <img
-            src={new URL('/public/logo.png', import.meta.url).toString()}
+            src={new URL('/logo.png', import.meta.url).toString()}
             style={{
               position: 'absolute',
               bottom: 40,

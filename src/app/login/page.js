@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { account, db, ID, Query } from "../../../lib/appwrite";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import { FaUser, FaLock, FaMinecraft, FaSignInAlt, FaUserPlus } from "react-icons/fa";
+import { FaUser, FaLock, FaGamepad, FaSignInAlt, FaUserPlus } from "react-icons/fa";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -227,7 +227,7 @@ export default function Login() {
                 <label htmlFor="uuid" className="sr-only">Minecraft UUID</label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <FaMinecraft className="h-5 w-5 text-gray-500" />
+                    <FaGamepad className="h-5 w-5 text-gray-500" />
                   </div>
                   <input
                     id="uuid"

@@ -10,7 +10,6 @@ export const size = {
 
 export default async function Image({ params }) {
   try {
-    // Get user data
     const userResponse = await db.listDocuments(
       "67a8e81100361d527692",
       "67a900dc003e3b7524ee",
@@ -19,12 +18,10 @@ export default async function Image({ params }) {
 
     const userData = userResponse.documents[0];
     
-    // Fetch Minecraft username
     const mcResponse = await fetch(`https://rigabank.dyplay.at/api/uuid?uuid=${params.id}`);
     const mcData = await mcResponse.json();
     const mcUsername = mcData.name;
 
-    // Fetch user's listings count
     const listingsResponse = await db.listDocuments(
       "67a8e81100361d527692",
       "67b2fdc20027f4d55440",
@@ -38,88 +35,188 @@ export default async function Image({ params }) {
             height: '100%',
             width: '100%',
             display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: '#111827',
-            background: 'linear-gradient(to top, #F97316 0%, rgba(249, 115, 22, 0) 50%, #111827 100%)',
+            backgroundColor: '#2E3440',
+            padding: '32px',
+            position: 'relative',
+            overflow: 'hidden',
           }}
         >
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '20px',
-              marginBottom: '20px',
-            }}
-          >
-            <img
-              src={`https://crafthead.net/helm/${params.id}`}
-              width="120"
-              height="120"
-              style={{
-                borderRadius: '16px',
-                border: '4px solid #F97316',
-              }}
-            />
-            <div
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'flex-start',
-              }}
-            >
-              <h1
-                style={{
-                  fontSize: 60,
-                  fontWeight: 'bold',
-                  color: 'white',
-                  margin: 0,
-                  textShadow: '2px 2px 4px rgba(0, 0, 0, 0.5)',
-                }}
-              >
-                {mcUsername}
-              </h1>
-              <p
-                style={{
-                  fontSize: 30,
-                  color: '#F97316',
-                  margin: 0,
-                  opacity: 0.9,
-                }}
-              >
-                {listingsResponse.documents.length} Properties Listed
-              </p>
-            </div>
-          </div>
-          {/* Logo */}
+          {/* Background Gradient */}
           <div
             style={{
               position: 'absolute',
-              bottom: 40,
-              left: 40,
+              top: 0,
+              right: 0,
+              width: '70%',
+              height: '100%',
+              background: 'linear-gradient(135deg, rgba(249, 115, 22, 0.15) 0%, rgba(249, 115, 22, 0) 100%)',
+              zIndex: 0,
+            }}
+          />
+
+          {/* Main Content */}
+          <div
+            style={{
               display: 'flex',
-              alignItems: 'center',
-              gap: '10px',
+              width: '100%',
+              zIndex: 1,
             }}
           >
+            {/* Left Column - Profile Info */}
             <div
               style={{
-                width: '120px',
-                height: '120px',
-                backgroundColor: '#F97316',
-                borderRadius: '12px',
+                width: '40%',
                 display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'white',
-                fontSize: '24px',
-                fontWeight: 'bold',
+                flexDirection: 'column',
+                borderRight: '1px solid rgba(249, 115, 22, 0.2)',
+                paddingRight: '32px',
               }}
             >
-              MRE
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '20px',
+                  marginBottom: '24px',
+                }}
+              >
+                <img
+                  src={`https://crafthead.net/helm/${params.id}`}
+                  width="120"
+                  height="120"
+                  style={{
+                    borderRadius: '16px',
+                    border: '3px solid #F97316',
+                  }}
+                />
+                <div>
+                  <h1
+                    style={{
+                      fontSize: 48,
+                      fontWeight: 'bold',
+                      color: 'white',
+                      margin: '0 0 8px 0',
+                    }}
+                  >
+                    {mcUsername}
+                  </h1>
+                  <p
+                    style={{
+                      fontSize: 20,
+                      color: '#F97316',
+                      margin: 0,
+                      opacity: 0.9,
+                    }}
+                  >
+                    Minecraft Real Estate
+                  </p>
+                </div>
+              </div>
+
+              {/* Stats */}
+              <div
+                style={{
+                  display: 'grid',
+                  gap: '16px',
+                }}
+              >
+                <div
+                  style={{
+                    backgroundColor: 'rgba(249, 115, 22, 0.1)',
+                    padding: '16px',
+                    borderRadius: '12px',
+                    border: '1px solid rgba(249, 115, 22, 0.2)',
+                  }}
+                >
+                  <p style={{ color: '#F97316', fontSize: 16, margin: '0 0 4px 0' }}>Properties Listed</p>
+                  <p style={{ color: 'white', fontSize: 32, fontWeight: 'bold', margin: 0 }}>
+                    {listingsResponse.documents.length}
+                  </p>
+                </div>
+                <div
+                  style={{
+                    backgroundColor: 'rgba(249, 115, 22, 0.1)',
+                    padding: '16px',
+                    borderRadius: '12px',
+                    border: '1px solid rgba(249, 115, 22, 0.2)',
+                  }}
+                >
+                  <p style={{ color: '#F97316', fontSize: 16, margin: '0 0 4px 0' }}>Member Since</p>
+                  <p style={{ color: 'white', fontSize: 24, fontWeight: 'bold', margin: 0 }}>
+                    {new Date(userData.$createdAt).toLocaleDateString()}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column - Listings Preview */}
+            <div
+              style={{
+                flex: 1,
+                paddingLeft: '32px',
+              }}
+            >
+              <h2
+                style={{
+                  fontSize: 24,
+                  color: '#F97316',
+                  margin: '0 0 16px 0',
+                  fontWeight: 'bold',
+                }}
+              >
+                Recent Listings
+              </h2>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(2, 1fr)',
+                  gap: '16px',
+                }}
+              >
+                {listingsResponse.documents.slice(0, 4).map((listing, index) => (
+                  <div
+                    key={index}
+                    style={{
+                      backgroundColor: 'rgba(249, 115, 22, 0.1)',
+                      borderRadius: '12px',
+                      overflow: 'hidden',
+                      border: '1px solid rgba(249, 115, 22, 0.2)',
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: '100%',
+                        height: '120px',
+                        backgroundImage: `url(${listing.imageUrls[0]})`,
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
+                      }}
+                    />
+                    <div style={{ padding: '12px' }}>
+                      <p style={{ color: 'white', fontSize: 16, margin: '0 0 4px 0', fontWeight: 'bold' }}>
+                        {listing.title}
+                      </p>
+                      <p style={{ color: '#F97316', fontSize: 14, margin: 0 }}>
+                        {new Intl.NumberFormat("de-DE").format(listing.price)}€
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
+
+          {/* Bottom Bar */}
+          <div
+            style={{
+              position: 'absolute',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              height: '4px',
+              background: 'linear-gradient(to right, #F97316, rgba(249, 115, 22, 0.2))',
+            }}
+          />
         </div>
       ),
       {
@@ -134,19 +231,18 @@ export default async function Image({ params }) {
             height: '100%',
             width: '100%',
             display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
+            backgroundColor: '#2E3440',
+            padding: '32px',
             justifyContent: 'center',
-            backgroundColor: '#111827',
-            background: 'linear-gradient(to top, #F97316 0%, rgba(249, 115, 22, 0) 50%, #111827 100%)',
+            alignItems: 'center',
           }}
         >
           <h1
             style={{
-              fontSize: 60,
+              fontSize: 48,
               fontWeight: 'bold',
               color: 'white',
-              textShadow: '2px 2px 4px rgba(0, 0, 0, 0.5)',
+              textAlign: 'center',
             }}
           >
             Minecraft Real Estate Profile

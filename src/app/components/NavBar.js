@@ -154,7 +154,7 @@ export default function Navbar() {
                 </Link>
                 
                 <Link 
-                  href={`/profile/${user?.sessionId}`}
+                  href={`/profile/${user.uuid}`}
                   className="flex items-center px-4 py-2 hover:bg-gray-700 transition text-gray-200"
                 >
                   <FaUser className="mr-2 text-orange-500" />

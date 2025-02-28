@@ -7,7 +7,7 @@ import { motion } from "framer-motion";
 import { FaTrash, FaEdit, FaImages } from "react-icons/fa";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import { FaTimes } from "react-icons/fa"; // Import close icon for modals
+import { FaTimes, FaHome } from "react-icons/fa"; // Import close icon for modals
 import Image from "next/image";
 import Link from "next/link";
 

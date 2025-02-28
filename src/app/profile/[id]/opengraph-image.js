@@ -93,16 +93,33 @@ export default async function Image({ params }) {
             </div>
           </div>
           {/* Logo */}
-          <img
-            src={new URL('/logo.png', import.meta.url).toString()}
+          <div
             style={{
               position: 'absolute',
               bottom: 40,
               left: 40,
-              width: 120,
-              height: 'auto',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
             }}
-          />
+          >
+            <div
+              style={{
+                width: '120px',
+                height: '120px',
+                backgroundColor: '#F97316',
+                borderRadius: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'white',
+                fontSize: '24px',
+                fontWeight: 'bold',
+              }}
+            >
+              MRE
+            </div>
+          </div>
         </div>
       ),
       {

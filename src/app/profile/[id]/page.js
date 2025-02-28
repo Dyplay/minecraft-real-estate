@@ -8,6 +8,7 @@ import { FaCheckCircle, FaPencilAlt, FaStar, FaMapMarkerAlt } from "react-icons/
 import Link from "next/link";
 import { useTrustedSellers } from "../../components/TrustedSellersProvider";
 import { motion } from "framer-motion";
+import Head from 'next/head';
 
 export default function ProfilePage() {
   const { id } = useParams();
@@ -119,101 +120,109 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Profile Header */}
-        <div className="bg-gray-800 rounded-lg shadow-lg overflow-hidden">
-          {/* Banner */}
-          <div className="h-40 bg-gradient-to-r from-gray-700 to-gray-600"></div>
-          
-          {/* Profile Info */}
-          <div className="relative px-6 pb-6">
-            <div className="flex items-center">
-              {/* Avatar */}
-              <div className="relative -mt-16">
-                <Image
-                  src={`https://crafthead.net/helm/${user.uuid}`}
-                  width={128}
-                  height={128}
-                  alt="Profile Picture"
-                  className="rounded-lg border-4 border-gray-900 shadow-xl"
-                />
-                {verifiedSellers.includes(user.uuid) && (
-                  <div className="absolute -bottom-2 -right-2 bg-orange-500 rounded-full p-1">
-                    <FaCheckCircle className="text-white text-xl" />
-                  </div>
-                )}
-              </div>
-
-              {/* User Info */}
-              <div className="ml-6 pt-6">
-                <div className="flex items-center gap-3">
-                  <h1 className="text-3xl font-bold">{user.mcUsername}</h1>
+    <>
+      <Head>
+        <title>{user ? `${user.mcUsername}'s Profile - Minecraft Real Estate` : 'Profile - Minecraft Real Estate'}</title>
+        <meta name="description" content={`View ${user?.mcUsername}'s property listings and profile information`} />
+        <meta property="og:image" content={`/api/og?title=${user?.mcUsername}'s Profile&subtitle=Minecraft Real Estate`} />
+        <meta property="twitter:image" content={`/api/og?title=${user?.mcUsername}'s Profile&subtitle=Minecraft Real Estate`} />
+      </Head>
+      <div className="min-h-screen bg-gray-900 text-white p-6">
+        <div className="max-w-7xl mx-auto">
+          {/* Profile Header */}
+          <div className="bg-gray-800 rounded-lg shadow-lg overflow-hidden">
+            {/* Banner */}
+            <div className="h-40 bg-gradient-to-r from-gray-700 to-gray-600"></div>
+            
+            {/* Profile Info */}
+            <div className="relative px-6 pb-6">
+              <div className="flex items-center">
+                {/* Avatar */}
+                <div className="relative -mt-16">
+                  <Image
+                    src={`https://crafthead.net/helm/${user.uuid}`}
+                    width={128}
+                    height={128}
+                    alt="Profile Picture"
+                    className="rounded-lg border-4 border-gray-900 shadow-xl"
+                  />
                   {verifiedSellers.includes(user.uuid) && (
-                    <span className="bg-orange-500 text-sm px-2 py-1 rounded-full">Trusted Seller</span>
+                    <div className="absolute -bottom-2 -right-2 bg-orange-500 rounded-full p-1">
+                      <FaCheckCircle className="text-white text-xl" />
+                    </div>
                   )}
                 </div>
-                <p className="text-gray-400 mt-1">Member since {new Date(user.$createdAt).toLocaleDateString()}</p>
-                <div className="flex items-center mt-2">
-                  <div className="flex items-center text-orange-500">
-                    {[...Array(5)].map((_, i) => (
-                      <FaStar
-                        key={i}
-                        className={i < Math.floor(averageRating) ? "text-orange-500" : "text-gray-600"}
-                      />
-                    ))}
+
+                {/* User Info */}
+                <div className="ml-6 pt-6">
+                  <div className="flex items-center gap-3">
+                    <h1 className="text-3xl font-bold">{user.mcUsername}</h1>
+                    {verifiedSellers.includes(user.uuid) && (
+                      <span className="bg-orange-500 text-sm px-2 py-1 rounded-full">Trusted Seller</span>
+                    )}
                   </div>
-                  <span className="ml-2 text-gray-300">
-                    {averageRating.toFixed(1)} ({totalReviews} {totalReviews === 1 ? 'review' : 'reviews'})
-                  </span>
+                  <p className="text-gray-400 mt-1">Member since {new Date(user.$createdAt).toLocaleDateString()}</p>
+                  <div className="flex items-center mt-2">
+                    <div className="flex items-center text-orange-500">
+                      {[...Array(5)].map((_, i) => (
+                        <FaStar
+                          key={i}
+                          className={i < Math.floor(averageRating) ? "text-orange-500" : "text-gray-600"}
+                        />
+                      ))}
+                    </div>
+                    <span className="ml-2 text-gray-300">
+                      {averageRating.toFixed(1)} ({totalReviews} {totalReviews === 1 ? 'review' : 'reviews'})
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Listings Section */}
-        <div className="mt-8">
-          <h2 className="text-2xl font-bold mb-6">Listed Properties ({listings.length})</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {listings.map((listing) => (
-              <motion.div
-                key={listing.$id}
-                whileHover={{ scale: 1.02 }}
-                className="bg-gray-800 rounded-lg overflow-hidden border border-gray-700 hover:border-orange-500 transition-all"
-              >
-                <Link href={`/listing/${listing.$id}`}>
-                  <div className="relative">
-                    <Image
-                      src={listing.imageUrls[0]}
-                      width={400}
-                      height={300}
-                      alt={listing.title}
-                      className="w-full h-48 object-cover"
-                    />
-                    <div className="absolute top-2 right-2 bg-orange-500 text-white px-3 py-1 rounded-md">
-                      {formatPrice(listing.price)}
+          {/* Listings Section */}
+          <div className="mt-8">
+            <h2 className="text-2xl font-bold mb-6">Listed Properties ({listings.length})</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {listings.map((listing) => (
+                <motion.div
+                  key={listing.$id}
+                  whileHover={{ scale: 1.02 }}
+                  className="bg-gray-800 rounded-lg overflow-hidden border border-gray-700 hover:border-orange-500 transition-all"
+                >
+                  <Link href={`/listing/${listing.$id}`}>
+                    <div className="relative">
+                      <Image
+                        src={listing.imageUrls[0]}
+                        width={400}
+                        height={300}
+                        alt={listing.title}
+                        className="w-full h-48 object-cover"
+                      />
+                      <div className="absolute top-2 right-2 bg-orange-500 text-white px-3 py-1 rounded-md">
+                        {formatPrice(listing.price)}
+                      </div>
                     </div>
-                  </div>
-                  <div className="p-4">
-                    <h3 className="text-xl font-semibold mb-2">{listing.title}</h3>
-                    <p className="text-gray-400 text-sm mb-2">{listing.description.substring(0, 100)}...</p>
-                    <div className="flex items-center text-gray-400">
-                      <FaMapMarkerAlt className="text-orange-500 mr-1" />
-                      <span>{listing.country || "Location not specified"}</span>
+                    <div className="p-4">
+                      <h3 className="text-xl font-semibold mb-2">{listing.title}</h3>
+                      <p className="text-gray-400 text-sm mb-2">{listing.description.substring(0, 100)}...</p>
+                      <div className="flex items-center text-gray-400">
+                        <FaMapMarkerAlt className="text-orange-500 mr-1" />
+                        <span>{listing.country || "Location not specified"}</span>
+                      </div>
                     </div>
-                  </div>
-                </Link>
-              </motion.div>
-            ))}
-          </div>
-          {listings.length === 0 && (
-            <div className="text-center py-12 bg-gray-800 rounded-lg border border-gray-700">
-              <p className="text-gray-400">No properties listed yet.</p>
+                  </Link>
+                </motion.div>
+              ))}
             </div>
-          )}
+            {listings.length === 0 && (
+              <div className="text-center py-12 bg-gray-800 rounded-lg border border-gray-700">
+                <p className="text-gray-400">No properties listed yet.</p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 } 

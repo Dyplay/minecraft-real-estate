@@ -116,7 +116,7 @@ async function uploadImages(existingImages = []) {
     }
   }
 
-  return uploadedImageUrls.slice(0, 5); // ✅ Ensure max 5 images
+  return uploadedImageUrls.slice(0, 10); // ✅ Ensure max 5 images
 }
 
   // ✅ Create or Update Listing
@@ -445,7 +445,7 @@ const removeImage = (index) => {
 
         {/* Image Upload Input (Max 5) */}
         <div className="mb-4">
-          <label className="block mb-2 text-gray-300">Upload Images (Max 5)</label>
+          <label className="block mb-2 text-gray-300">Upload Images (Max 10)</label>
           <div className="flex items-center">
             <input 
               type="file" 

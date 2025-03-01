@@ -472,108 +472,70 @@ export default function ListingPage() {
   return (
     <div className="min-h-screen bg-gray-900 py-8">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 flex flex-col lg:flex-row gap-8">
-        {/* Report Modal */}
-        {showReportModal && (
-          <div className="fixed inset-0 flex justify-center items-center bg-black bg-opacity-70 z-50">
-            <div className="bg-gray-800 p-6 rounded-lg shadow-lg text-center w-[90%] max-w-md border border-gray-700">
-              <div className="flex items-center justify-center mb-4">
-                <FaFlag className="text-orange-500 mr-2 text-xl" />
-                <h2 className="text-xl font-semibold text-white">Report Listing</h2>
-              </div>
-              <p className="text-orange-400 text-sm mt-2 flex items-center justify-center">
-                <FaExclamationTriangle className="mr-1" />
-                Mass false reporting is bannable.
-              </p>
-
-              {/* Dropdown for selecting a reason */}
-              <select
-                className="w-full mt-4 p-2 border rounded-md bg-gray-700 border-gray-600 text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
-                value={reportReason}
-                onChange={(e) => setReportReason(e.target.value)}
-              >
-                <option value="">Select a reason...</option>
-                <option value="Inappropriate Content">Inappropriate Content</option>
-                <option value="Not Their Property">Not Their Property</option>
-                <option value="Scam / Fraud">Scam / Fraud</option>
-              </select>
-
-              {/* Submit Button */}
-              <button
-                onClick={handleReportSubmit}
-                className={`mt-4 w-full py-2 rounded-lg text-white font-bold transition ${
-                  isLoading
-                    ? "bg-gray-600 cursor-not-allowed"
-                    : "bg-orange-500 hover:bg-orange-600"
-                }`}
-                disabled={isLoading}
-              >
-                {isLoading ? "Submitting..." : "Submit Report"}
-              </button>
-
-              {/* Close Button */}
-              <button
-                onClick={() => setShowReportModal(false)}
-                className="mt-2 text-gray-400 hover:text-white hover:underline"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Purchase Popup */}
-        {showPurchasePopup && (
-          <div className="fixed inset-0 flex justify-center items-center bg-black bg-opacity-70 z-[9999]">
-            <div className="bg-gray-800 p-6 rounded-lg shadow-lg text-center w-[90%] max-w-md border border-gray-700 z-[10000]">
-              <h2 className="text-xl font-semibold text-white">{purchaseStep}</h2>
-              {isLoading ? (
-                <div className="w-12 h-12 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mt-4"></div>
-              ) : (
-                <div className="text-red-500 text-3xl mt-4">❌</div> // X icon for declined
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* 🔹 Left Section - Image Gallery */}
+        {/* Left Section - Image Gallery */}
         <div className="lg:w-2/3">
           {/* Main Image Display */}
-          <div className="relative rounded-lg overflow-hidden shadow-xl border border-gray-700">
+          <div className="relative rounded-lg overflow-hidden shadow-xl border border-gray-700 max-w-[900px] mx-auto">
             {currentImage && (
-              <Image
-                src={currentImage}
-                alt="Main Listing Image"
-                width={1000}
-                height={600}
-                className="object-cover w-full h-[50vh] md:h-[60vh] lg:h-[515px]"
-              />
+              <div className="aspect-[16/9]">
+                <Image
+                  src={currentImage}
+                  alt="Main Listing Image"
+                  fill
+                  priority
+                  className="object-contain bg-gray-800"
+                  sizes="(max-width: 900px) 100vw, 900px"
+                />
+              </div>
             )}
           </div>
       
           {/* Thumbnail Navigation */}
-          <div className="mt-4 flex justify-center gap-2 overflow-x-auto pb-2">
-            {imageUrls.map((url, index) => (
-              url && (
-                <Image
-                  key={index}
-                  src={url}
-                  width={120}
-                  height={80}
-                  alt={`Thumbnail ${index + 1}`}
-                  className={`cursor-pointer rounded-lg shadow-md transition ${
-                    currentImage === url 
-                      ? "border-4 border-orange-500" 
-                      : "opacity-75 border border-gray-700"
-                  } object-cover w-[120px] h-[80px]`}
-                  onClick={() => setCurrentImage(url)}
-                />
-              )
-            ))}
+          <div className="mt-4 flex gap-2 overflow-x-auto pb-4 px-2 max-w-[900px] mx-auto">
+            <style jsx global>{`
+              .thumbnail-scroll::-webkit-scrollbar {
+                height: 8px;
+              }
+              .thumbnail-scroll::-webkit-scrollbar-track {
+                background: #1F2937;
+                border-radius: 4px;
+              }
+              .thumbnail-scroll::-webkit-scrollbar-thumb {
+                background: #F97316;
+                border-radius: 4px;
+              }
+              .thumbnail-scroll::-webkit-scrollbar-thumb:hover {
+                background: #EA580C;
+              }
+            `}</style>
+            <div className="flex gap-2 overflow-x-auto thumbnail-scroll w-full pb-2">
+              {imageUrls.map((url, index) => (
+                url && (
+                  <div
+                    key={index}
+                    className="flex-shrink-0"
+                  >
+                    <Image
+                      src={url}
+                      width={120}
+                      height={80}
+                      alt={`Thumbnail ${index + 1}`}
+                      className={`cursor-pointer rounded-lg shadow-md transition transform hover:scale-105 ${
+                        currentImage === url 
+                          ? "border-4 border-orange-500" 
+                          : "opacity-75 hover:opacity-100 border border-gray-700"
+                      } object-cover w-[120px] h-[80px]`}
+                      onClick={() => setCurrentImage(url)}
+                    />
+                  </div>
+                )
+              ))}
+            </div>
           </div>
         </div>
       
-        {/* 🔹 Right Section - Details & Purchase */}
-        <div className="lg:w-1/3 bg-gray-800 p-6 shadow-lg rounded-lg border border-gray-700 text-white">
+        {/* Right Section - Details & Purchase */}
+        <div className="lg:w-1/3 bg-gray-800 p-6 shadow-lg rounded-lg border border-gray-700 text-white h-fit">
           {user?.uuid === listing.sellerUUID && (
             <div className="flex items-center bg-gray-700 text-orange-400 px-3 py-1 rounded-md text-sm mb-2">
               <FaExclamationTriangle className="mr-1" /> This is your listing

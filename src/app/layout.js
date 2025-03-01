@@ -3,6 +3,7 @@ import "./globals.css";
 import Navbar from "./components/NavBar";
 import TrustedSellersProvider from "./components/TrustedSellersProvider"; // ✅ Import
 import BanCheckWrapper from './components/BanCheckWrapper';
+import TawkToChat from '../components/TawkToChat';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -23,6 +24,7 @@ export default function RootLayout({ children }) {
           <BanCheckWrapper>
             {children}
           </BanCheckWrapper>
+          <TawkToChat />
         </TrustedSellersProvider>
       </body>
     </html>

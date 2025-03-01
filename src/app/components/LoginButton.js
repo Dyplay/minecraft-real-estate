@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { account, getUserSession } from "../../../lib/appwrite";
 import { useRouter } from "next/navigation";
 import { toast } from "react-toastify";
+import { FaDiscord } from "react-icons/fa";
 
 export default function Login() {
   const router = useRouter();
@@ -14,10 +15,10 @@ export default function Login() {
       const session = await getUserSession();
       if (session) {
         console.log("✅ User already logged in, redirecting...");
-        router.push("/uuid"); // ✅ Redirect if session exists
+        router.push("/uuid");
         return;
       }
-      setLoading(false); // Allow login if no session found
+      setLoading(false);
     };
 
     checkSession();
@@ -27,32 +28,33 @@ export default function Login() {
     try {
       await account.createOAuth2Session(
         "discord",
-        `${window.location.origin}/uuid`, // ✅ Redirect to UUID after successful login
-        `${window.location.origin}/login` // Redirect back on failure
+        `${window.location.origin}/uuid`,
+        `${window.location.origin}/login`
       );
     } catch (error) {
       console.error("❌ OAuth Login Failed:", error);
-      toast.error("⚠ Login failed, please try again.");
+      toast.error("Login failed. Please try again.");
     }
   };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen text-blue-600">
-        <p>⏳ Checking for existing session...</p>
+      <div className="flex items-center justify-center gap-2 text-orange-500">
+        <div className="w-6 h-6 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
+        <p>Checking session...</p>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
-      <h1 className="text-2xl font-bold mb-4 text-black">Login to your real estate account</h1>
-      <button
-        onClick={handleLogin}
-        className="bg-blue-600 text-white px-6 py-3 rounded-lg shadow-md hover:bg-blue-500 transition"
-      >
-        Login with Discord
-      </button>
-    </div>
+    <button
+      onClick={handleLogin}
+      className="w-full bg-[#5865F2] hover:bg-[#4752C4] text-white px-6 py-4 rounded-xl shadow-lg 
+                 flex items-center justify-center gap-3 transition-all duration-200 transform hover:scale-[1.02]
+                 border border-[#5865F2]/20 font-medium text-lg"
+    >
+      <FaDiscord className="text-2xl" />
+      Continue with Discord
+    </button>
   );
 }

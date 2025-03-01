@@ -164,6 +164,7 @@ async function uploadImages(existingImages = []) {
         price: formattedPrice,
         country: form.country,
         type: form.type,
+        available: true,
         imageUrls: uploadedImages, // ✅ Updated image list
       };
   

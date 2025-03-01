@@ -640,12 +640,73 @@ export default function ListingPage() {
             </div>
           )}
 
-          <p
-            className="mt-4 text-orange-500 text-sm cursor-pointer hover:underline flex items-center"
-            onClick={() => setShowReportModal(true)}
-          >
-            <FaFlag className="mr-1" /> Report this post
-          </p>
+          {/* Move Report Button to better location */}
+          <div className="mt-6 pt-4 border-t border-gray-700">
+            <button
+              onClick={() => setShowReportModal(true)}
+              className="w-full flex items-center justify-center gap-2 text-orange-500 hover:text-orange-400 py-2 px-4 rounded-lg border border-orange-500/20 hover:bg-orange-500/10 transition-all"
+            >
+              <FaFlag className="text-lg" />
+              Report this listing
+            </button>
+          </div>
+
+          {/* Report Modal */}
+          {showReportModal && (
+            <div className="fixed inset-0 flex justify-center items-center bg-black bg-opacity-70 z-50">
+              <div className="bg-gray-800 p-6 rounded-lg shadow-lg w-[90%] max-w-md border border-gray-700">
+                <div className="flex items-center justify-center mb-4">
+                  <FaFlag className="text-orange-500 mr-2 text-xl" />
+                  <h2 className="text-xl font-semibold text-white">Report Listing</h2>
+                </div>
+
+                <p className="text-orange-400 text-sm mt-2 mb-4 flex items-center justify-center">
+                  <FaExclamationTriangle className="mr-1" />
+                  Mass false reporting is bannable.
+                </p>
+
+                <select
+                  className="w-full p-3 mb-4 rounded-lg bg-gray-700 border border-gray-600 text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  value={reportReason}
+                  onChange={(e) => setReportReason(e.target.value)}
+                >
+                  <option value="">Select a reason...</option>
+                  <option value="Inappropriate Content">Inappropriate Content</option>
+                  <option value="Not Their Property">Not Their Property</option>
+                  <option value="Scam / Fraud">Scam / Fraud</option>
+                  <option value="Wrong Information">Wrong Information</option>
+                  <option value="Other">Other</option>
+                </select>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setShowReportModal(false)}
+                    className="w-1/2 py-2 px-4 rounded-lg bg-gray-700 text-white hover:bg-gray-600 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleReportSubmit}
+                    disabled={!reportReason || isLoading}
+                    className={`w-1/2 py-2 px-4 rounded-lg font-medium transition-colors ${
+                      !reportReason || isLoading
+                        ? "bg-gray-600 text-gray-400 cursor-not-allowed"
+                        : "bg-orange-500 text-white hover:bg-orange-600"
+                    }`}
+                  >
+                    {isLoading ? (
+                      <div className="flex items-center justify-center gap-2">
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        Submitting...
+                      </div>
+                    ) : (
+                      "Submit Report"
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* 🔹 Reviews Section */}
           <div className="mt-8 border-t border-gray-700 pt-6">

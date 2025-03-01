@@ -719,7 +719,7 @@ export default function ListingPage() {
                 rows={4}
               />
               
-              {/* Character Counter */}
+              {/* Character Counter d*/}
               <p className="absolute bottom-2 right-3 text-sm text-gray-400">
                 {review.comment.length}/1000
               </p>

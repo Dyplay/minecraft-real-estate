@@ -10,7 +10,6 @@ import { db, Query, storage, account, ID, client } from "../../../../lib/appwrit
 import Skeleton from "../../../app/components/ListingSkeleton";
 import Image from "next/image";
 import { toast } from "react-toastify";
-import Head from "next/head";
 dotenv.config();
 
 export default function ListingPage() {

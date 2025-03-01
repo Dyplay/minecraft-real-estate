@@ -1,4 +1,5 @@
 import { db } from '../../../../lib/appwrite';
+import { Query } from 'appwrite';
 
 export async function generateMetadata({ params }) {
   try {
@@ -9,33 +10,65 @@ export async function generateMetadata({ params }) {
       params.id
     );
 
-    const title = listing ? `${listing.title} - Minecraft Real Estate` : 'Property Listing - Minecraft Real Estate';
-    const description = listing?.description || 'View detailed information about this Minecraft property listing';
+    // Fetch seller data
+    const sellerResponse = await db.listDocuments(
+      "67a8e81100361d527692",
+      "67a900dc003e3b7524ee",
+      [Query.equal("uuid", listing.sellerUUID)]
+    );
+    const seller = sellerResponse.documents[0];
+
+    // Format price
+    const formattedPrice = new Intl.NumberFormat("de-DE").format(listing.price) + "€";
 
     return {
-      title,
-      description,
+      title: `${listing.title} - Minecraft Real Estate`,
+      description: listing.description,
       openGraph: {
-        title,
-        description,
-        images: [{
-          url: `/listing/${params.id}/opengraph-image`,
-          width: 1200,
-          height: 630,
-          alt: 'Property Listing OpenGraph Image',
-        }],
+        title: `${listing.title} - ${formattedPrice}`,
+        description: listing.description,
+        images: [
+          {
+            url: listing.imageUrls[0],
+            width: 1200,
+            height: 630,
+            alt: listing.title,
+          }
+        ],
+        locale: 'en_US',
+        type: 'website',
+        siteName: 'Minecraft Real Estate',
+        url: `https://realestate.dyplay.at/listing/${params.id}`,
       },
       twitter: {
         card: 'summary_large_image',
-        title,
-        description,
-        images: [`/listing/${params.id}/opengraph-image`],
+        title: `${listing.title} - ${formattedPrice}`,
+        description: listing.description,
+        images: [listing.imageUrls[0]],
+        creator: '@MinecraftRealEstate',
       },
+      other: {
+        'theme-color': '#F97316',
+      }
     };
   } catch (error) {
+    // Fallback metadata if fetching fails
     return {
       title: 'Property Listing - Minecraft Real Estate',
-      description: 'View detailed information about this Minecraft property listing',
+      description: 'View this amazing Minecraft property listing',
+      openGraph: {
+        title: 'Property Listing - Minecraft Real Estate',
+        description: 'View this amazing Minecraft property listing',
+        images: ['/default-listing-image.jpg'],
+        type: 'website',
+        siteName: 'Minecraft Real Estate',
+      },
+      twitter: {
+        card: 'summary_large_image',
+        title: 'Property Listing - Minecraft Real Estate',
+        description: 'View this amazing Minecraft property listing',
+        images: ['/default-listing-image.jpg'],
+      },
     };
   }
 } 

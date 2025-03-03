@@ -28,3 +28,57 @@ body {
   background: var(--background);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Add this to fix hydration styling issues */
+body:not(.hydrated) .listings-container {
+  visibility: hidden;
+}
+
+body.hydrated .listings-container {
+  visibility: visible;
+}
+
+/* Make sure there are no conflicting styles */
+.listings-container * {
+  box-sizing: border-box;
+}
+
+/* Add !important to critical styles if needed */
+.listing-card {
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* Add these specific fixes for the listing page */
+.listing-page-container {
+  width: 100% !important;
+  max-width: 100% !important;
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+}
+
+@media (min-width: 1024px) {
+  .listing-page-container {
+    grid-template-columns: 1fr 1fr !important;
+  }
+}
+
+/* Fix for image gallery */
+.image-gallery {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+/* Fix for details section */
+.listing-details {
+  width: 100% !important;
+  padding: 1rem !important;
+}
+
+/* Ensure all content is visible */
+body.hydrated .listing-page-container,
+body.hydrated .image-gallery,
+body.hydrated .listing-details {
+  visibility: visible !important;
+  opacity: 1 !important;
+}

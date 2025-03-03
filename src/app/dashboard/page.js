@@ -29,6 +29,8 @@ export default function Dashboard() {
     country: "Riga",
     type: "buy",
     imageUrls: [],
+    coordinateX: "0",
+    coordinateZ: "0"
   });
   const [currentEditId, setCurrentEditId] = useState(null);
   const [editingId, setEditingId] = useState(null);
@@ -39,8 +41,11 @@ export default function Dashboard() {
     country: "Riga",
     type: "buy",
     imageUrls: [],
+    coordinateX: "0",
+    coordinateZ: "0"
   });
   const [purchases, setPurchases] = useState([]);
+  const [coordinates, setCoordinates] = useState({ x: 0, z: 0 });
 
   const router = useRouter();
   const bucketId = "67b2fe15002b214adfba";
@@ -177,31 +182,60 @@ async function uploadImages(existingImages = []) {
         country: form.country,
         type: form.type,
         Available: true,  // Use capital 'A' to match your schema
-        imageUrls: uploadedImages
+        imageUrls: uploadedImages,
+        coordinateX: form.coordinateX,
+        coordinateZ: form.coordinateZ,
+        coordinates: `${form.coordinateX},${form.coordinateZ}`
       };
       
       // Log the data being sent to help debug
       console.log("Sending listing data:", listingData);
   
-      // Track the event with PostHog
-      captureEvent('listing_action_started', { 
-        action: editingId ? 'update' : 'create',
-        listingId: documentId
-      });
+      // Improved event tracking with better error handling
+      try {
+        if (typeof window !== 'undefined' && window.posthog) {
+          window.posthog.capture(editingId ? 'listing_updated' : 'listing_created', { 
+            listingId: documentId,
+            title: form.title,
+            price: formattedPrice,
+            country: form.country,
+            type: form.type,
+            imageCount: uploadedImages.length,
+            hasCoordinates: !!form.coordinateX && !!form.coordinateZ
+          });
+        }
+      } catch (eventError) {
+        console.error("Error tracking event:", eventError);
+      }
   
       if (editingId) {
-        await db.updateDocument("67a8e81100361d527692", "67b2fdc20027f4d55440", editingId, listingData);
-        toast.success("✅ Listing updated successfully!");
-        captureEvent('listing_updated', { listingId: editingId });
+        // Check if the document exists before updating
+        try {
+          // First try to get the document to make sure it exists
+          await db.getDocument("67a8e81100361d527692", "67b2fdc20027f4d55440", editingId);
+          
+          // If we get here, the document exists, so update it
+          await db.updateDocument("67a8e81100361d527692", "67b2fdc20027f4d55440", editingId, listingData);
+          toast.success("✅ Listing updated successfully!");
+        } catch (docError) {
+          if (docError.code === 404) {
+            // Document doesn't exist, create a new one instead
+            console.warn("Document not found, creating new instead of updating");
+            await db.createDocument("67a8e81100361d527692", "67b2fdc20027f4d55440", documentId, listingData);
+            toast.success("✅ Listing created successfully!");
+          } else {
+            // Some other error occurred
+            throw docError;
+          }
+        }
       } else {
         await db.createDocument("67a8e81100361d527692", "67b2fdc20027f4d55440", documentId, listingData);
         toast.success("✅ Listing created successfully!");
-        captureEvent('listing_created', { listingId: documentId });
       }
   
       setEditingId(null);
       setImageFiles([]);
-      setForm({ title: "", description: "", price: "", country: "Riga", type: "buy", imageUrls: [] });
+      setForm({ title: "", description: "", price: "", country: "Riga", type: "buy", imageUrls: [], coordinateX: "0", coordinateZ: "0" });
   
       const response = await db.listDocuments("67a8e81100361d527692", "67b2fdc20027f4d55440", [
         Query.equal("sellerUUID", user.uuid),
@@ -209,19 +243,35 @@ async function uploadImages(existingImages = []) {
       setListings(response.documents);
     } catch (error) {
       console.error("🚨 Error handling listing:", error);
-      // Log more details about the error
+      // More detailed error logging
       console.error("Error details:", {
         message: error.message,
         code: error.code,
-        type: error.type
+        type: error.type,
+        stack: error.stack
       });
-      toast.error("❌ Failed to process listing. Try again.");
       
-      // Track the error with PostHog
-      captureEvent('listing_action_failed', { 
-        action: editingId ? 'update' : 'create',
-        error: error.message
-      });
+      // More user-friendly error messages based on error type
+      if (error.code === 404) {
+        toast.error("❌ The listing you're trying to update no longer exists.");
+      } else if (error.code === 401 || error.code === 403) {
+        toast.error("❌ You don't have permission to perform this action.");
+      } else {
+        toast.error("❌ Failed to process listing. Try again.");
+      }
+      
+      // Improved error event tracking
+      try {
+        if (typeof window !== 'undefined' && window.posthog) {
+          window.posthog.capture('listing_action_failed', { 
+            action: editingId ? 'update' : 'create',
+            error: error.message,
+            errorCode: error.code || 'unknown'
+          });
+        }
+      } catch (eventError) {
+        console.error("Error tracking error event:", eventError);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -258,24 +308,24 @@ const removeImage = (index) => {
     }
   }  
 
-  const openEditModal = (listing) => {
-    captureEvent('edit_modal_opened', { 
-      listingId: listing.$id,
-      listingTitle: listing.title
-    });
+  const handleEditClick = (listing) => {
+    // Make sure we're using the correct ID field from Appwrite
+    const listingId = listing.$id;
+    console.log("Editing listing with ID:", listingId);
     
+    setEditingId(listingId);
     setEditForm({
-      title: listing.title,
-      description: listing.description,
-      price: listing.price,
-      country: listing.country,
-      type: listing.type,
+      title: listing.title || "",
+      description: listing.description || "",
+      price: listing.price || "",
+      country: listing.country || "Riga",
+      type: listing.type || "buy",
       imageUrls: listing.imageUrls || [],
+      coordinateX: listing.coordinateX || "0",
+      coordinateZ: listing.coordinateZ || "0"
     });
-    setCurrentEditId(listing.$id);
-    setImageFiles([]); // Reset image files when opening modal
-    setModalOpen(true); // ✅ Open the modal
-  };  
+    setModalOpen(true);
+  };
 
   function confirmDelete(id) {
     captureEvent('delete_confirmation_opened', { listingId: id });
@@ -290,61 +340,95 @@ const removeImage = (index) => {
   };  
 
   const handleEditSubmit = async () => {
-    if (!currentEditId) return;
-  
-    // ✅ Convert price to a float safely
-    const formattedPrice = parseFloat(editForm.price);
-    
-    if (isNaN(formattedPrice)) {
-      toast.error("❌ Price must be a valid number!");
-      captureEvent('form_validation_error', { type: 'invalid_price', location: 'edit_modal' });
+    if (!editingId) {
+      console.error("No editing ID found");
+      toast.error("❌ Cannot update: listing ID is missing");
       return;
     }
-  
-    if (formattedPrice > 10000000000) {
-      toast.error("⚠ Price cannot exceed 10,000,000,000!");
-      captureEvent('form_validation_error', { type: 'price_too_high', location: 'edit_modal' });
-      return;
-    }
-  
-    captureEvent('edit_listing_started', { 
-      listingId: currentEditId,
-      imageCount: editForm.imageUrls.length + imageFiles.length
-    });
-  
-    try {
-      // Upload any new images and combine with existing ones
-      const uploadedImageUrls = await uploadImages(editForm.imageUrls);
 
-      await db.updateDocument("67a8e81100361d527692", "67b2fdc20027f4d55440", currentEditId, {
-        ...editForm,
-        price: formattedPrice, // ✅ Ensure valid float
-        imageUrls: uploadedImageUrls, // Include updated image URLs
-      });
-  
-      toast.success("✅ Listing updated successfully!");
-      captureEvent('listing_edited', { 
-        listingId: currentEditId,
-        price: formattedPrice,
-        country: editForm.country,
-        imageCount: uploadedImageUrls.length
-      });
-      setImageFiles([]); // Clear image files after update
-  
-      // Refresh listings
-      const response = await db.listDocuments("67a8e81100361d527692", "67b2fdc20027f4d55440", [
-        Query.equal("sellerUUID", user.uuid),
-      ]);
-      setListings(response.documents);
-  
-      closeModal();
+    try {
+      setSubmitting(true);
+      console.log("Updating listing with ID:", editingId);
+      
+      // Upload any new images
+      let updatedImageUrls = [...editForm.imageUrls];
+      
+      if (imageFiles.length > 0) {
+        const uploadedImages = await Promise.all(
+          imageFiles.map(async (file) => {
+            const fileId = ID.unique();
+            await storage.createFile(bucketId, fileId, file);
+            const fileUrl = storage.getFileView(bucketId, fileId);
+            return fileUrl.href;
+          })
+        );
+        
+        updatedImageUrls = [...updatedImageUrls, ...uploadedImages];
+      }
+      
+      // Check if document exists before updating
+      try {
+        await db.getDocument("67a8e81100361d527692", "67b2fdc20027f4d55440", editingId);
+        
+        // If we get here, document exists, so update it
+        await db.updateDocument(
+          "67a8e81100361d527692",
+          "67b2fdc20027f4d55440",
+          editingId,
+          {
+            title: editForm.title,
+            description: editForm.description,
+            price: editForm.price,
+            country: editForm.country,
+            type: editForm.type,
+            imageUrls: updatedImageUrls,
+            coordinateX: editForm.coordinateX,
+            coordinateZ: editForm.coordinateZ,
+            coordinates: `${editForm.coordinateX},${editForm.coordinateZ}`
+          }
+        );
+        
+        // Update the listings state
+        setListings(
+          listings.map((listing) =>
+            listing.$id === editingId
+              ? {
+                  ...listing,
+                  title: editForm.title,
+                  description: editForm.description,
+                  price: editForm.price,
+                  country: editForm.country,
+                  type: editForm.type,
+                  imageUrls: updatedImageUrls,
+                  coordinateX: editForm.coordinateX,
+                  coordinateZ: editForm.coordinateZ,
+                  coordinates: `${editForm.coordinateX},${editForm.coordinateZ}`
+                }
+              : listing
+          )
+        );
+        
+        setModalOpen(false);
+        setEditingId(null);
+        setImageFiles([]);
+        toast.success("Listing updated successfully!");
+      } catch (docError) {
+        if (docError.code === 404) {
+          toast.error("❌ This listing no longer exists");
+          // Refresh listings to remove the non-existent one
+          const response = await db.listDocuments("67a8e81100361d527692", "67b2fdc20027f4d55440", [
+            Query.equal("sellerUUID", user.uuid),
+          ]);
+          setListings(response.documents);
+        } else {
+          throw docError;
+        }
+      }
     } catch (error) {
-      console.error("🚨 Error updating listing:", error);
-      toast.error("❌ Failed to update listing.");
-      captureEvent('listing_edit_failed', { 
-        listingId: currentEditId,
-        error: error.message
-      });
+      console.error("Error updating listing:", error);
+      toast.error("Failed to update listing");
+    } finally {
+      setSubmitting(false);
     }
   };  
 
@@ -410,6 +494,64 @@ const removeImage = (index) => {
       toast.error("Test listing failed: " + error.message);
     }
   }
+
+  // Add this to your useEffect
+  useEffect(() => {
+    // ... existing code ...
+    
+    // Refresh listings every 5 minutes to ensure we have the latest data
+    const refreshInterval = setInterval(async () => {
+      if (user && user.uuid) {
+        try {
+          const response = await db.listDocuments("67a8e81100361d527692", "67b2fdc20027f4d55440", [
+            Query.equal("sellerUUID", user.uuid),
+          ]);
+          setListings(response.documents);
+        } catch (error) {
+          console.error("Error refreshing listings:", error);
+        }
+      }
+    }, 5 * 60 * 1000); // 5 minutes
+    
+    return () => {
+      clearInterval(refreshInterval);
+    };
+  }, [user]);
+
+  useEffect(() => {
+    if (editingId && listings.length > 0) {
+      const listing = listings.find((l) => l.$id === editingId);
+      if (listing && listing.coordinates) {
+        try {
+          const [x, z] = listing.coordinates.split(",").map(Number);
+          setCoordinates({ x, z });
+        } catch (e) {
+          console.error("Error parsing coordinates:", e);
+          setCoordinates({ x: 0, z: 0 });
+        }
+      }
+    }
+  }, [editingId, listings]);
+
+  // Add this function to your dashboard page
+  async function verifyCoordinates() {
+    if (!editingId) return;
+    
+    try {
+      const listing = await db.getDocument("67a8e81100361d527692", "67b2fdc20027f4d55440", editingId);
+      console.log("Listing coordinates from database:", {
+        coordinateX: listing.coordinateX,
+        coordinateZ: listing.coordinateZ,
+        coordinates: listing.coordinates
+      });
+    } catch (error) {
+      console.error("Error verifying coordinates:", error);
+    }
+  }
+
+  // Call this after updating a listing
+  // Add this to your handleEditSubmit function after the update is successful
+  verifyCoordinates();
 
   if (loading) {
     return <p className="text-center text-white">🔄 Loading session...</p>;
@@ -568,6 +710,42 @@ const removeImage = (index) => {
               )}
             </div>
 
+            {/* Add this to your form section in the dashboard page */}
+            <div className="mb-4">
+              <h3 className="text-lg font-semibold text-white mb-2">Property Coordinates</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-gray-300 mb-1">X Coordinate</label>
+                  <input
+                    type="text"
+                    placeholder="X Coordinate"
+                    className="w-full p-3 bg-gray-700 text-white rounded border border-gray-600 focus:border-orange-500 focus:outline-none"
+                    value={editForm.coordinateX || "0"}
+                    onChange={(e) => setEditForm({
+                      ...editForm,
+                      coordinateX: e.target.value
+                    })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-gray-300 mb-1">Z Coordinate</label>
+                  <input
+                    type="text"
+                    placeholder="Z Coordinate"
+                    className="w-full p-3 bg-gray-700 text-white rounded border border-gray-600 focus:border-orange-500 focus:outline-none"
+                    value={editForm.coordinateZ || "0"}
+                    onChange={(e) => setEditForm({
+                      ...editForm,
+                      coordinateZ: e.target.value
+                    })}
+                  />
+                </div>
+              </div>
+              <p className="text-sm text-gray-400 mt-1">
+                These coordinates will be used to show your property location on the map.
+              </p>
+            </div>
+
             {/* Action Buttons */}
             <div className="flex justify-between mt-4">
               <button 
@@ -675,6 +853,42 @@ const removeImage = (index) => {
           })}
         </div>
 
+        {/* Add this to your form section in the dashboard page */}
+        <div className="mb-4">
+          <h3 className="text-lg font-semibold text-white mb-2">Property Coordinates</h3>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-gray-300 mb-1">X Coordinate</label>
+              <input
+                type="text"
+                placeholder="X Coordinate"
+                className="w-full p-3 bg-gray-700 text-white rounded border border-gray-600 focus:border-orange-500 focus:outline-none"
+                value={form.coordinateX || "0"}
+                onChange={(e) => setForm({
+                  ...form,
+                  coordinateX: e.target.value
+                })}
+              />
+            </div>
+            <div>
+              <label className="block text-gray-300 mb-1">Z Coordinate</label>
+              <input
+                type="text"
+                placeholder="Z Coordinate"
+                className="w-full p-3 bg-gray-700 text-white rounded border border-gray-600 focus:border-orange-500 focus:outline-none"
+                value={form.coordinateZ || "0"}
+                onChange={(e) => setForm({
+                  ...form,
+                  coordinateZ: e.target.value
+                })}
+              />
+            </div>
+          </div>
+          <p className="text-sm text-gray-400 mt-1">
+            These coordinates will be used to show your property location on the map.
+          </p>
+        </div>
+
         {/* Submit Button */}
         <button 
           onClick={handleListing} 
@@ -734,7 +948,7 @@ const removeImage = (index) => {
                 </button>
                 <button 
                   className="flex items-center text-orange-500 hover:text-orange-400 transition" 
-                  onClick={() => openEditModal(listing)}
+                  onClick={() => handleEditClick(listing)}
                 >
                   <FaEdit className="mr-1" /> Edit
                 </button>

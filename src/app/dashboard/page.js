@@ -10,6 +10,7 @@ import "react-toastify/dist/ReactToastify.css";
 import { FaTimes, FaHome } from "react-icons/fa"; // Import close icon for modals
 import Image from "next/image";
 import Link from "next/link";
+import { captureEvent, identifyUser } from "../../../lib/posthog";
 
 export default function Dashboard() {
   const [user, setUser] = useState(null);
@@ -67,6 +68,16 @@ export default function Dashboard() {
 
         const userData = userResponse.documents[0];
         setUser({ ...userData, avatar: `https://crafthead.net/helm/${userData.uuid}` });
+        
+        // Identify user in PostHog
+        identifyUser(userData.uuid, {
+          username: userData.username,
+          email: userData.email || undefined,
+          ip: userIP
+        });
+        
+        // Track dashboard view
+        captureEvent('dashboard_viewed');
 
         const listingsResponse = await db.listDocuments("67a8e81100361d527692", "67b2fdc20027f4d55440", [
           Query.equal("sellerUUID", userData.uuid),
@@ -157,6 +168,7 @@ async function uploadImages(existingImages = []) {
   
       const uploadedImages = await uploadImages(existingImages);
   
+      // Define only the fields that exist in your Appwrite schema
       const listingData = {
         sellerUUID: user.uuid,
         title: form.title,
@@ -164,16 +176,27 @@ async function uploadImages(existingImages = []) {
         price: formattedPrice,
         country: form.country,
         type: form.type,
-        available: true,
-        imageUrls: uploadedImages, // ✅ Updated image list
+        Available: true,  // Use capital 'A' to match your schema
+        imageUrls: uploadedImages
       };
+      
+      // Log the data being sent to help debug
+      console.log("Sending listing data:", listingData);
+  
+      // Track the event with PostHog
+      captureEvent('listing_action_started', { 
+        action: editingId ? 'update' : 'create',
+        listingId: documentId
+      });
   
       if (editingId) {
         await db.updateDocument("67a8e81100361d527692", "67b2fdc20027f4d55440", editingId, listingData);
         toast.success("✅ Listing updated successfully!");
+        captureEvent('listing_updated', { listingId: editingId });
       } else {
         await db.createDocument("67a8e81100361d527692", "67b2fdc20027f4d55440", documentId, listingData);
         toast.success("✅ Listing created successfully!");
+        captureEvent('listing_created', { listingId: documentId });
       }
   
       setEditingId(null);
@@ -186,13 +209,26 @@ async function uploadImages(existingImages = []) {
       setListings(response.documents);
     } catch (error) {
       console.error("🚨 Error handling listing:", error);
+      // Log more details about the error
+      console.error("Error details:", {
+        message: error.message,
+        code: error.code,
+        type: error.type
+      });
       toast.error("❌ Failed to process listing. Try again.");
+      
+      // Track the error with PostHog
+      captureEvent('listing_action_failed', { 
+        action: editingId ? 'update' : 'create',
+        error: error.message
+      });
     } finally {
       setSubmitting(false);
     }
   }  
 
 const removeImage = (index) => {
+  captureEvent('image_removed', { location: 'create_form' });
   setImageFiles((prevFiles) => prevFiles.filter((_, i) => i !== index)); // ✅ Remove by index
 };
 
@@ -200,19 +236,34 @@ const removeImage = (index) => {
   async function deleteListing() {
     if (!deleteId) return;
   
+    captureEvent('listing_delete_started', { listingId: deleteId });
+  
     try {
       await db.deleteDocument("67a8e81100361d527692", "67b2fdc20027f4d55440", deleteId);
       setListings((prev) => prev.filter((listing) => listing.$id !== deleteId));
       toast.success("✅ Listing deleted successfully!");
+      captureEvent('listing_deleted', { 
+        listingId: deleteId,
+        success: true
+      });
     } catch (error) {
       console.error("🚨 Error deleting listing:", error);
       toast.error("❌ Failed to delete listing.");
+      captureEvent('listing_delete_failed', { 
+        listingId: deleteId,
+        error: error.message
+      });
     } finally {
       setModalOpen2(false); // Close modal after action
     }
   }  
 
   const openEditModal = (listing) => {
+    captureEvent('edit_modal_opened', { 
+      listingId: listing.$id,
+      listingTitle: listing.title
+    });
+    
     setEditForm({
       title: listing.title,
       description: listing.description,
@@ -222,15 +273,18 @@ const removeImage = (index) => {
       imageUrls: listing.imageUrls || [],
     });
     setCurrentEditId(listing.$id);
+    setImageFiles([]); // Reset image files when opening modal
     setModalOpen(true); // ✅ Open the modal
   };  
 
   function confirmDelete(id) {
+    captureEvent('delete_confirmation_opened', { listingId: id });
     setDeleteId(id);
     setModalOpen2(true);
   }  
 
   const closeModal = () => {
+    captureEvent('modal_closed', { type: 'edit_listing' });
     setModalOpen(false);
     setCurrentEditId(null);
   };  
@@ -243,21 +297,39 @@ const removeImage = (index) => {
     
     if (isNaN(formattedPrice)) {
       toast.error("❌ Price must be a valid number!");
+      captureEvent('form_validation_error', { type: 'invalid_price', location: 'edit_modal' });
       return;
     }
   
     if (formattedPrice > 10000000000) {
       toast.error("⚠ Price cannot exceed 10,000,000,000!");
+      captureEvent('form_validation_error', { type: 'price_too_high', location: 'edit_modal' });
       return;
     }
   
+    captureEvent('edit_listing_started', { 
+      listingId: currentEditId,
+      imageCount: editForm.imageUrls.length + imageFiles.length
+    });
+  
     try {
+      // Upload any new images and combine with existing ones
+      const uploadedImageUrls = await uploadImages(editForm.imageUrls);
+
       await db.updateDocument("67a8e81100361d527692", "67b2fdc20027f4d55440", currentEditId, {
         ...editForm,
         price: formattedPrice, // ✅ Ensure valid float
+        imageUrls: uploadedImageUrls, // Include updated image URLs
       });
   
       toast.success("✅ Listing updated successfully!");
+      captureEvent('listing_edited', { 
+        listingId: currentEditId,
+        price: formattedPrice,
+        country: editForm.country,
+        imageCount: uploadedImageUrls.length
+      });
+      setImageFiles([]); // Clear image files after update
   
       // Refresh listings
       const response = await db.listDocuments("67a8e81100361d527692", "67b2fdc20027f4d55440", [
@@ -269,17 +341,75 @@ const removeImage = (index) => {
     } catch (error) {
       console.error("🚨 Error updating listing:", error);
       toast.error("❌ Failed to update listing.");
+      captureEvent('listing_edit_failed', { 
+        listingId: currentEditId,
+        error: error.message
+      });
     }
   };  
 
   const handleFileChange = (e) => {
     const newFiles = Array.from(e.target.files);
   
+    captureEvent('images_added', { 
+      count: newFiles.length,
+      location: modalOpen ? 'edit_modal' : 'create_form'
+    });
+    
     setImageFiles((prevFiles) => {
       const allFiles = [...prevFiles, ...newFiles].slice(0, 10); // ✅ Append new files, keep max 5
       return allFiles;
     });
   };   
+
+  // Add function to remove an image from the edit form
+  const removeEditImage = (index) => {
+    captureEvent('image_removed', { location: 'edit_modal' });
+    setEditForm(prev => ({
+      ...prev,
+      imageUrls: prev.imageUrls.filter((_, i) => i !== index)
+    }));
+  };
+
+  // Add this function to your Dashboard component
+  async function testCreateListing() {
+    try {
+      // Get the Appwrite collection schema first to see what fields are available
+      const collection = await db.getCollection("67a8e81100361d527692", "67b2fdc20027f4d55440");
+      console.log("Collection schema:", collection);
+      
+      // Create a minimal test listing with only basic fields
+      const minimalData = {
+        sellerUUID: user.uuid,
+        title: "Test Listing",
+        description: "Test Description",
+        price: 100,
+        country: "Riga",
+        type: "buy",
+        imageUrls: []
+      };
+      
+      console.log("Attempting to create with data:", minimalData);
+      
+      const result = await db.createDocument(
+        "67a8e81100361d527692", 
+        "67b2fdc20027f4d55440", 
+        ID.unique(), 
+        minimalData
+      );
+      
+      console.log("Test listing created successfully:", result);
+      toast.success("Test listing created!");
+    } catch (error) {
+      console.error("Test listing error:", error);
+      console.error("Error details:", {
+        message: error.message,
+        code: error.code,
+        type: error.type
+      });
+      toast.error("Test listing failed: " + error.message);
+    }
+  }
 
   if (loading) {
     return <p className="text-center text-white">🔄 Loading session...</p>;
@@ -321,7 +451,7 @@ const removeImage = (index) => {
             initial={{ opacity: 0, y: -50 }} 
             animate={{ opacity: 1, y: 0 }} 
             exit={{ opacity: 0, y: -50 }} 
-            className="bg-gray-800 p-6 rounded-lg w-96 border border-gray-700 shadow-xl"
+            className="bg-gray-800 p-6 rounded-lg w-96 border border-gray-700 shadow-xl max-h-[90vh] overflow-y-auto"
           >
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-semibold text-white">Edit Listing</h2>
@@ -372,6 +502,71 @@ const removeImage = (index) => {
               <option value="Riga">Riga</option>
               <option value="Lavantal">Lavantal</option>
             </select>
+
+            {/* Image Upload Section for Edit Modal */}
+            <div className="mb-4">
+              <label className="block mb-2 text-gray-300">Current Images</label>
+              {/* Display current images with delete option */}
+              <div className="grid grid-cols-3 gap-2 mb-3">
+                {editForm.imageUrls && editForm.imageUrls.map((url, index) => (
+                  <div key={index} className="relative">
+                    <Image 
+                      src={url} 
+                      width={100} 
+                      height={80} 
+                      alt="Listing image" 
+                      className="rounded border border-gray-700"
+                    />
+                    <button 
+                      className="absolute top-0 right-0 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center hover:bg-red-700 transition"
+                      onClick={() => removeEditImage(index)}
+                    >
+                      ✖
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              {/* Add new images */}
+              <label className="block mb-2 text-gray-300">Add New Images ({10 - (editForm.imageUrls?.length || 0)} remaining)</label>
+              <input 
+                type="file" 
+                multiple 
+                accept="image/*" 
+                onChange={handleFileChange}
+                className="text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:bg-orange-500 file:text-white hover:file:bg-orange-600"
+                disabled={(editForm.imageUrls?.length || 0) >= 10}
+              />
+              
+              {/* Preview of new images to be added */}
+              {imageFiles.length > 0 && (
+                <>
+                  <p className="text-sm text-gray-400 mt-3 mb-1">New images to add:</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {imageFiles.map((file, index) => {
+                      const previewUrl = URL.createObjectURL(file);
+                      return (
+                        <div key={`new-${index}`} className="relative">
+                          <Image 
+                            src={previewUrl} 
+                            width={100} 
+                            height={80} 
+                            alt="Preview" 
+                            className="rounded border border-gray-700" 
+                          />
+                          <button 
+                            className="absolute top-0 right-0 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center hover:bg-red-700 transition"
+                            onClick={() => removeImage(index)}
+                          >
+                            ✖
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
 
             {/* Action Buttons */}
             <div className="flex justify-between mt-4">

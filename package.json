@@ -17,15 +17,16 @@
     "framer-motion": "^12.4.3",
     "next": "15.1.7",
     "next-auth": "^4.24.11",
+    "posthog-js": "^1.225.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-icons": "^5.4.0",
     "react-markdown": "^10.0.0",
     "react-toastify": "^11.0.3",
+    "react-tooltip": "^5.28.0",
     "rehype-raw": "^7.0.0",
     "remark-breaks": "^4.0.0",
     "remark-gfm": "^4.0.1",
-    "react-tooltip": "^5.28.0",
     "swiper": "^11.2.4"
   },
   "devDependencies": {

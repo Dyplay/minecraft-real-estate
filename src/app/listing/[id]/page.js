@@ -512,7 +512,7 @@ export default function ListingPage() {
   const coords = getCoordinates(listing);
 
   console.log("Using coordinates:", coords);
-  console.log("Map URL:", `http://45.93.250.230/#overworld:${coords.x}:222:${coords.z}:132:-1.17:0:0:0:perspective`);
+  console.log("Map URL:", `http://45.93.250.230/#overworld:${coords.x}:222:${coords.z}:132:-1.17:0:0:1:flat`);
 
   return (
     <div className="min-h-screen bg-gray-900 py-12 px-4 sm:px-6 lg:px-8 w-full">
@@ -605,7 +605,7 @@ export default function ListingPage() {
                 <div className="relative w-full h-64">
                   {listing.country === "Riga" ? (
                     <iframe 
-                      src={`http://45.93.250.230/#overworld:${listing.coordinateX}:222:${listing.coordinateZ}:132:-1.17:0:0:0:perspective`}
+                      src={`http://45.93.250.230/#overworld:${listing.coordinateX}:222:${listing.coordinateZ}:132:-1.17:0:0:1:flat`}
                       className="w-full h-full border-0 rounded-lg"
                       title="Property Location on Blue Maps"
                       loading="lazy"
@@ -613,7 +613,7 @@ export default function ListingPage() {
                     ></iframe>
                   ) : listing.country === "Lavantal" ? (
                     <iframe 
-                      src={`http://45.93.250.230/#lavantal:${listing.coordinateX}:222:${listing.coordinateZ}:132:-1.17:0:0:0:perspective`}
+                      src={`http://45.93.250.230/#lavantal:${listing.coordinateX}:222:${listing.coordinateZ}:132:-1.17:0:0:1:flat`}
                       className="w-full h-full border-0 rounded-lg"
                       title="Property Location on Blue Maps"
                       loading="lazy"

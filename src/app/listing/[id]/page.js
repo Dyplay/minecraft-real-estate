@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import dotenv from "dotenv";
 import { FaCheckCircle, FaExclamationTriangle, FaStar, FaRegStar, FaFlag } from "react-icons/fa";
@@ -34,6 +34,11 @@ export default function ListingPage() {
   const [currentImage, setCurrentImage] = useState(null); // ✅ Track selected image
   const [showSpinner, setShowSpinner] = useState(true); // Added for spinner state
   const [showPopup, setShowPopup] = useState(false); // State to control the popup visibility
+  const [currentPurchaseId, setCurrentPurchaseId] = useState(null); // Add a new state to track the purchase ID
+
+  // Add these refs
+  const unsubscribeRef = useRef(null);
+  const purchaseTimerRef = useRef(null);
 
   const countryFlags = {
     Riga: "/flags/riga.webp", // Replace with actual flag path
@@ -301,142 +306,246 @@ export default function ListingPage() {
 
   const handlePurchase = async () => {
     if (!user) {
-      toast.error("Please login to make a purchase");
+      toast.error("You must be logged in to purchase properties");
       return;
     }
-
-    // Show the confirmation popup
+    
+    // Check if user is trying to buy their own listing
+    if (user.uuid === listing.sellerUUID) {
+      toast.error("You cannot purchase your own listing");
+      return;
+    }
+    
     setShowPurchasePopup(true);
-    setPurchaseStep("Waiting for bank confirmation...");
-    setIsLoading(true); // Set loading state
+    setPurchaseStep("initial");
+  };
 
+  // Add the handleApproveTransaction function
+  const handleApproveTransaction = async () => {
     try {
-      console.log("Starting purchase process...");
-
-      // Check if sellerUUID is available
-      if (!listing.sellerUUID) {
-        toast.error("Seller information is missing. Cannot proceed with the purchase.");
-        setIsLoading(false);
-        setShowPurchasePopup(false);
-        return;
-      }
-
-      console.log("Seller UUID:", listing.sellerUUID);
-
-      // Create purchase request in the correct bank purchase requests collection
+      setPurchaseStep("approving");
+      
+      // Create purchase request
       const purchaseRequest = await db.createDocument(
-        "67a8e81100361d527692", // Database ID
-        "67b6049900036a440ded",  // Correct Bank Purchase Requests Collection ID
+        "67a8e81100361d527692",
+        "67b6049900036a440ded",
         ID.unique(),
         {
           shopname: listing.title,
-          seller: seller.username,
+          seller: seller?.username || "Unknown",
+          sellerUUID: listing.sellerUUID,
+          buyer: user.mcUsername,
           buyerUUID: user.uuid,
-          buyer: user.username,
-          confirmed: false, // Initially set to false
           price: listing.price,
           productName: listing.title,
-          sellerUUID: listing.sellerUUID // Ensure sellerUUID is included
         }
       );
-
+      
+      // Store purchase ID in state
+      setCurrentPurchaseId(purchaseRequest.$id);
+      
       console.log("Purchase request created:", purchaseRequest);
-
-      // Set up the real-time listener for the specific purchase document
-      const unsubscribe = client.subscribe(
-        `databases.67a8e81100361d527692.collections.67b6049900036a440ded.documents.${purchaseRequest.$id}`,
-        async response => {
-          console.log("📩 Received purchase update:", response);
-
-          if (response.events.includes(`databases.*.collections.*.documents.${purchaseRequest.$id}.update`)) {
-            const updatedConfirmed = response.payload.confirmed;
-
-            // Check if the purchase is confirmed
-            if (updatedConfirmed) {
-              // Update the listing's Available attribute to false
-              await db.updateDocument(
-                "67a8e81100361d527692", // Database ID
-                "67b2fdc20027f4d55440", // Listing Collection ID
-                listing.$id, // Use the listing ID
-                { Available: false } // Set Available to false
-              );
-
-              // Log the purchase ID before redirecting
-              console.log("Redirecting to receipt with purchase ID:", purchaseRequest.$id);
-              // Redirect to the receipt page
+      
+      // Deduct money from buyer's account
+      try {
+        console.log("Attempting to deduct money from buyer's account");
+        
+        // Find buyer's money account using their Minecraft username
+        const moneyAccountsResponse = await db.listDocuments(
+          "67a8e81100361d527692",
+          "67b093040006e14307e1",
+          [Query.equal("user_name", user.mcUsername)]
+        );
+        
+        console.log("Money accounts search results:", moneyAccountsResponse);
+        
+        if (moneyAccountsResponse.documents.length === 0) {
+          console.error("No money account found for user:", user.mcUsername);
+          toast.error("Could not find your bank account");
+          setShowPurchasePopup(false);
+          return;
+        }
+        
+        const moneyAccount = moneyAccountsResponse.documents[0];
+        console.log("Found money account:", moneyAccount);
+        
+        // Check if user has enough balance
+        if (moneyAccount.balance < listing.price) {
+          console.error("Insufficient funds. Balance:", moneyAccount.balance, "Price:", listing.price);
+          toast.error("Insufficient funds in your account");
+          setShowPurchasePopup(false);
+          return;
+        }
+        
+        // Calculate new balance
+        const newBalance = moneyAccount.balance - listing.price;
+        console.log("Deducting price from balance:", moneyAccount.balance, "-", listing.price, "=", newBalance);
+        
+        // Update user's balance
+        await db.updateDocument(
+          "67a8e81100361d527692",
+          "67b093040006e14307e1",
+          moneyAccount.$id,
+          {
+            balance: newBalance
+          }
+        );
+        
+        console.log("Money successfully deducted. New balance:", newBalance);
+        
+        // Update purchase request to confirmed
+        await db.updateDocument(
+          "67a8e81100361d527692",
+          "67b6049900036a440ded",
+          purchaseRequest.$id,
+          {
+            confirmed: true
+          }
+        );
+        
+        console.log("Purchase confirmed after successful payment");
+        
+        // Update listing availability
+        await db.updateDocument(
+          "67a8e81100361d527692",
+          "67b2fdc20027f4d55440",
+          listing.$id,
+          {
+            Available: false
+          }
+        );
+        
+        console.log("Listing marked as unavailable");
+        
+        // Set purchase step to approved (UI will update via real-time or polling)
+        setPurchaseStep("approved");
+        
+        // Wait 2 seconds before redirect
+        setTimeout(() => {
+          console.log("Redirecting to receipt page");
+          router.push(`/receipt/${purchaseRequest.$id}`);
+        }, 2000);
+        
+        return;
+      } catch (paymentError) {
+        console.error("Error processing payment:", paymentError);
+        toast.error("Error processing payment");
+        setShowPurchasePopup(false);
+        return;
+      }
+      
+      // Define a function to check purchase status
+      const checkPurchaseStatus = async () => {
+        try {
+          console.log("Checking purchase status for ID:", purchaseRequest.$id);
+          const updatedPurchase = await db.getDocument(
+            "67a8e81100361d527692",
+            "67b6049900036a440ded",
+            purchaseRequest.$id
+          );
+          
+          console.log("Purchase status check result:", updatedPurchase);
+          
+          if (updatedPurchase.confirmed === true) {
+            console.log("Purchase confirmed via polling");
+            setPurchaseStep("approved");
+            
+            // Wait 2 seconds before redirect
+            setTimeout(() => {
+              console.log("Redirecting to receipt page");
               router.push(`/receipt/${purchaseRequest.$id}`);
-            } else {
-              // Handle payment declined
-              toast.error("❌ Payment Declined");
-              setPurchaseStep("Payment Declined");
-              setIsLoading(false);
-              setShowPurchasePopup(true);
+            }, 2000);
+            
+            // Clear the polling interval
+            if (purchaseTimerRef.current) {
+              clearInterval(purchaseTimerRef.current);
+              purchaseTimerRef.current = null;
             }
           }
+        } catch (error) {
+          console.error("Error checking purchase status:", error);
         }
-      );
-
-      console.log("Real-time listener set up for purchase request:", purchaseRequest.$id);
-
-      // Clean up the listener when the component unmounts or loading state changes
-      return () => {
-        unsubscribe();
-        setIsLoading(false);
       };
+      
+      // Set up polling as a fallback (checks every 3 seconds)
+      purchaseTimerRef.current = setInterval(checkPurchaseStatus, 3000);
+      
+      // Also try the real-time approach
+      try {
+        console.log("Setting up real-time listener for purchase ID:", purchaseRequest.$id);
+        
+        // Store the unsubscribe function in ref
+        unsubscribeRef.current = client.subscribe(
+          `databases.67a8e81100361d527692.collections.67b6049900036a440ded.documents.${purchaseRequest.$id}`,
+          (response) => {
+            console.log("Real-time update received:", response);
+            
+            if (response.events.some(event => event.includes('update'))) {
+              console.log("Update event detected, payload:", response.payload);
+              
+              if (response.payload.confirmed === true) {
+                console.log("Purchase confirmed via real-time");
+                setPurchaseStep("approved");
+                
+                // Clear the polling interval since we got a real-time update
+                if (purchaseTimerRef.current) {
+                  clearInterval(purchaseTimerRef.current);
+                  purchaseTimerRef.current = null;
+                }
+                
+                setTimeout(() => {
+                  console.log("Redirecting to receipt page");
+                  router.push(`/receipt/${purchaseRequest.$id}`);
+                }, 2000);
+              }
+            }
+          }
+        );
+        
+        console.log("Real-time subscription created and stored in ref");
+      } catch (rtError) {
+        console.error("Error setting up real-time subscription:", rtError);
+        console.log("Falling back to polling only");
+      }
+      
     } catch (error) {
-      console.error("Error initiating purchase:", error);
-      toast.error("Failed to initiate purchase");
-      setIsLoading(false);
+      console.error("Error creating purchase:", error);
+      toast.error("Error creating purchase request");
       setShowPurchasePopup(false);
+      
+      // Clean up any timers
+      if (purchaseTimerRef.current) {
+        clearInterval(purchaseTimerRef.current);
+        purchaseTimerRef.current = null;
+      }
     }
   };
 
-  // In your component's useEffect, set up the listener conditionally
+  // Update the cleanup useEffect
   useEffect(() => {
-    if (isLoading && listing) {
-      // Set up the listener only if the user is in the loading state
-      const unsubscribe = client.subscribe(
-        `databases.67a8e81100361d527692.collections.67b6049900036a440ded.documents.${id}`,
-        response => {
-          console.log("📩 Received listing update:", response);
-
-          if (response.events.includes(`databases.*.collections.*.documents.${id}.update`)) {
-            const updatedAvailable = response.payload.Available;
-
-            // Check if the availability status has changed
-            if (updatedAvailable === false) {
-              // Redirect to the receipt page
-              router.push(`/receipt/${response.payload.purchaseId}`);
-            } else if (updatedAvailable === true) {
-              // Set Available back to NULL and update the UI
-              setListing(prevListing => ({
-                ...prevListing,
-                ...response.payload,
-                Available: null
-              }));
-
-              // Update the UI to show "Payment Declined"
-              toast.error("❌ Payment Declined");
-              setShowPopup(false);
-              setIsLoading(false);
-            } else {
-              // If it's NULL, set it to true
-              setListing(prevListing => ({
-                ...prevListing,
-                ...response.payload,
-                Available: updatedAvailable === null ? true : updatedAvailable
-              }));
-            }
-          }
+    // Cleanup function
+    return () => {
+      console.log("Component unmounting, cleaning up subscriptions and timers");
+      
+      // Clean up real-time subscription
+      if (unsubscribeRef.current) {
+        try {
+          unsubscribeRef.current();
+          console.log("Real-time subscription unsubscribed");
+        } catch (error) {
+          console.error("Error unsubscribing:", error);
         }
-      );
-
-      // Clean up the listener when loading state changes
-      return () => {
-        unsubscribe();
-      };
-    }
-  }, [isLoading, id]);
+        unsubscribeRef.current = null;
+      }
+      
+      // Clean up polling interval
+      if (purchaseTimerRef.current) {
+        clearInterval(purchaseTimerRef.current);
+        purchaseTimerRef.current = null;
+        console.log("Polling timer cleared");
+      }
+    };
+  }, []);
 
   // ✅ Move `submitReview` OUTSIDE `useEffect`
   async function submitReview() {
@@ -673,19 +782,19 @@ export default function ListingPage() {
             {/* 🔹 Buy Button */}
             <button
               className={`w-full mt-4 py-3 rounded-lg text-white font-bold transition ${
-                !listing.Available || !user || user?.uuid === listing?.sellerUUID
+                !listing.Available || !user
                   ? "bg-gray-600 cursor-not-allowed"
                   : "bg-orange-500 hover:bg-orange-600"
               }`}
-              disabled={!listing.Available || !user || user?.uuid === listing?.sellerUUID}
+              disabled={!listing.Available || !user}
               onClick={handlePurchase}
             >
               {!user ? (
                 "Please login to purchase"
-              ) : user?.uuid === listing?.sellerUUID ? (
-                "This is your listing"
               ) : !listing.Available ? (
                 "Not Available"
+              ) : user?.uuid === listing?.sellerUUID ? (
+                "Test Buy (Your Listing)"
               ) : (
                 "Buy Now"
               )}
@@ -901,6 +1010,100 @@ export default function ListingPage() {
           </div>
         </div>
       </div>
+
+      {/* Custom Purchase Approval Popup */}
+      {showPurchasePopup && (
+        <div className="fixed inset-0 flex justify-center items-center bg-black bg-opacity-70 z-[9999]">
+          <div className="bg-gray-800 rounded-xl overflow-hidden shadow-2xl border border-gray-700 w-[90%] max-w-md transform transition-all">
+            {/* Header */}
+            <div className="bg-gray-700 px-6 py-4 border-b border-gray-600">
+              <div className="flex items-center">
+                <div className="w-10 h-10 rounded-full bg-orange-500 flex items-center justify-center mr-3">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-white" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <h2 className="text-white text-xl font-bold">Payment Confirmation</h2>
+              </div>
+            </div>
+            
+            {/* Body */}
+            <div className="p-6">
+              {purchaseStep === "initial" ? (
+                <>
+                  <div className="mb-6">
+                    <p className="text-gray-300 mb-4">Please confirm your purchase:</p>
+                    <div className="bg-gray-700 rounded-lg overflow-hidden">
+                      <div className="p-4 border-b border-gray-600">
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-400">Property:</span>
+                          <span className="text-white font-bold">{listing.title}</span>
+                        </div>
+                      </div>
+                      <div className="p-4 border-b border-gray-600">
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-400">Price:</span>
+                          <span className="text-orange-500 font-bold">{new Intl.NumberFormat("de-DE").format(listing.price)}€</span>
+                        </div>
+                      </div>
+                      <div className="p-4">
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-400">Seller:</span>
+                          <span className="text-white">{seller?.username || "Unknown"}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex gap-3">
+                    <button 
+                      onClick={() => setShowPurchasePopup(false)}
+                      className="flex-1 py-3 px-4 rounded-lg bg-gray-700 hover:bg-gray-600 text-white font-medium transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleApproveTransaction}
+                      className="flex-1 py-3 px-4 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-medium transition-colors flex items-center justify-center"
+                    >
+                      Confirm Purchase
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 ml-2" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    </button>
+                  </div>
+                </>
+              ) : purchaseStep === "approving" ? (
+                <div className="text-center py-6">
+                  <div className="w-20 h-20 mx-auto mb-6 relative">
+                    <div className="absolute inset-0 rounded-full border-4 border-orange-500 border-t-transparent animate-spin"></div>
+                    <div className="absolute inset-3 rounded-full bg-gray-700 flex items-center justify-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-orange-500" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                  </div>
+                  <h3 className="text-white text-xl font-bold mb-2">Processing Payment</h3>
+                  <p className="text-gray-400">Please wait while we process your transaction...</p>
+                </div>
+              ) : (
+                <div className="text-center py-6">
+                  <div className="w-20 h-20 mx-auto mb-6 bg-green-500 rounded-full flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-white" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <h3 className="text-white text-xl font-bold mb-2">Payment Approved!</h3>
+                  <p className="text-gray-400 mb-4">We're finalizing your purchase now...</p>
+                  <div className="w-16 h-1 mx-auto bg-gray-700 rounded-full overflow-hidden">
+                    <div className="h-full bg-orange-500 animate-pulse"></div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

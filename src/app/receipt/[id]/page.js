@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
-import { useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { db } from "../../../../lib/appwrite";
 import { PDFDownloadLink, Document, Page, Text, View, StyleSheet, Image } from "@react-pdf/renderer";
 import { toast, ToastContainer } from "react-toastify";
@@ -11,64 +10,66 @@ import { FaDownload, FaReceipt, FaArrowLeft } from "react-icons/fa";
 import Link from "next/link";
 
 export default function ReceiptPage() {
+  const { id } = useParams();
   const router = useRouter();
-  const params = useParams(); // Use useParams to get route parameters
-  const id = params.id; // Access id from params
-  const [receipt, setReceipt] = useState(null);
+  const [purchaseData, setPurchaseData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [showPurchasePopup, setShowPurchasePopup] = useState(false);
+  const [approvalStep, setApprovalStep] = useState("initial");
 
   useEffect(() => {
     async function fetchPurchaseDetails() {
-      if (!id) {
-        setLoading(false);
-        return;
-      }
-      
       try {
+        // Check if ID is valid
+        if (!id || id === "undefined") {
+          console.error("Invalid receipt ID");
+          setError("Invalid receipt ID. Redirecting to home...");
+          setTimeout(() => router.push("/"), 3000);
+          return;
+        }
+
         console.log("Fetching receipt with ID:", id);
-        const receiptData = await db.getDocument(
-          "67a8e81100361d527692", // Database ID
-          "67b6049900036a440ded", // Collection ID
-          id // Use the ID from the URL params
+        
+        const purchaseDoc = await db.getDocument(
+          "67a8e81100361d527692",
+          "67b6049900036a440ded",
+          id
         );
-        console.log("Receipt data:", receiptData);
-        setReceipt(receiptData);
+
+        setPurchaseData(purchaseDoc);
       } catch (error) {
         console.error("Error fetching receipt:", error);
-        toast.error("Failed to fetch receipt details");
+        setError("Could not find the receipt. Redirecting to home...");
+        setTimeout(() => router.push("/"), 3000);
       } finally {
         setLoading(false);
       }
     }
 
     fetchPurchaseDetails();
-  }, [id]);
+  }, [id, router]);
 
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-orange-500 mx-auto"></div>
-          <p className="mt-4 text-gray-400">Loading receipt...</p>
-        </div>
+        <div className="animate-spin w-10 h-10 border-4 border-orange-500 border-t-transparent rounded-full"></div>
       </div>
     );
   }
-  
-  if (!receipt) {
+
+  if (error) {
     return (
-      <div className="min-h-screen bg-gray-900 flex flex-col items-center justify-center text-white">
-        <div className="bg-gray-800 p-8 rounded-lg shadow-lg border border-gray-700 text-center max-w-md">
-          <div className="w-16 h-16 mx-auto bg-red-500 rounded-full flex items-center justify-center mb-4">
-            <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
-            </svg>
-          </div>
-          <h2 className="text-2xl font-bold mb-4">Receipt Not Found</h2>
-          <p className="text-gray-400 mb-6">The receipt you're looking for doesn't exist or has been removed.</p>
-          <Link href="/dashboard" className="bg-orange-500 text-white px-4 py-2 rounded hover:bg-orange-600 transition inline-flex items-center">
-            <FaArrowLeft className="mr-2" /> Back to Dashboard
-          </Link>
+      <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center justify-center p-6">
+        <div className="bg-gray-800 rounded-lg p-8 max-w-md shadow-lg border border-gray-700">
+          <h1 className="text-2xl font-bold text-orange-500 mb-4">Error</h1>
+          <p className="mb-4">{error}</p>
+          <button 
+            onClick={() => router.push("/")}
+            className="bg-orange-500 hover:bg-orange-600 text-white py-2 px-4 rounded transition"
+          >
+            Return to Home
+          </button>
         </div>
       </div>
     );
@@ -108,7 +109,7 @@ export default function ReceiptPage() {
                 <div>
                   <h3 className="text-xl font-semibold">Transaction #{id.substring(0, 8)}</h3>
                   <p className="text-gray-400 text-sm">
-                    {new Date(receipt.$createdAt).toLocaleDateString()} at {new Date(receipt.$createdAt).toLocaleTimeString()}
+                    {new Date(purchaseData.$createdAt).toLocaleDateString()} at {new Date(purchaseData.$createdAt).toLocaleTimeString()}
                   </p>
                 </div>
               </div>
@@ -125,17 +126,17 @@ export default function ReceiptPage() {
               <div>
                 <h4 className="text-gray-400 text-sm mb-2">Property Details</h4>
                 <div className="bg-gray-700 p-4 rounded-lg">
-                  <p className="mb-2"><span className="text-gray-400">Shop Name:</span> <span className="font-semibold">{receipt.shopname}</span></p>
-                  <p className="mb-2"><span className="text-gray-400">Product:</span> <span className="font-semibold">{receipt.productName}</span></p>
-                  <p><span className="text-gray-400">Price:</span> <span className="font-semibold text-orange-500">{receipt.price}€</span></p>
+                  <p className="mb-2"><span className="text-gray-400">Shop Name:</span> <span className="font-semibold">{purchaseData.shopname}</span></p>
+                  <p className="mb-2"><span className="text-gray-400">Product:</span> <span className="font-semibold">{purchaseData.productName}</span></p>
+                  <p><span className="text-gray-400">Price:</span> <span className="font-semibold text-orange-500">{purchaseData.price}€</span></p>
                 </div>
               </div>
               
               <div>
                 <h4 className="text-gray-400 text-sm mb-2">Transaction Parties</h4>
                 <div className="bg-gray-700 p-4 rounded-lg">
-                  <p className="mb-2"><span className="text-gray-400">Seller:</span> <span className="font-semibold">{receipt.seller}</span></p>
-                  <p><span className="text-gray-400">Buyer:</span> <span className="font-semibold">{receipt.buyer}</span></p>
+                  <p className="mb-2"><span className="text-gray-400">Seller:</span> <span className="font-semibold">{purchaseData.seller}</span></p>
+                  <p><span className="text-gray-400">Buyer:</span> <span className="font-semibold">{purchaseData.buyer}</span></p>
                 </div>
               </div>
             </div>
@@ -159,7 +160,7 @@ export default function ReceiptPage() {
             
             <div className="mt-6 text-center">
               <PDFDownloadLink
-                document={<ReceiptPDF receipt={receipt} />}
+                document={<ReceiptPDF purchaseData={purchaseData} />}
                 fileName={`receipt-${id}.pdf`}
                 className="bg-orange-500 text-white px-6 py-3 rounded-lg hover:bg-orange-600 transition inline-flex items-center"
               >
@@ -185,6 +186,100 @@ export default function ReceiptPage() {
           </div>
         </div>
       </div>
+
+      {/* Custom Purchase Approval Popup */}
+      {showPurchasePopup && (
+        <div className="fixed inset-0 flex justify-center items-center bg-black bg-opacity-70 z-[9999]">
+          <div className="bg-gray-800 rounded-xl overflow-hidden shadow-2xl border border-gray-700 w-[90%] max-w-md transform transition-all">
+            {/* Header */}
+            <div className="bg-gray-700 px-6 py-4 border-b border-gray-600">
+              <div className="flex items-center">
+                <div className="w-10 h-10 rounded-full bg-orange-500 flex items-center justify-center mr-3">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-white" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <h2 className="text-white text-xl font-bold">Payment Confirmation</h2>
+              </div>
+            </div>
+            
+            {/* Body */}
+            <div className="p-6">
+              {approvalStep === "initial" ? (
+                <>
+                  <div className="mb-6">
+                    <p className="text-gray-300 mb-4">Please confirm your purchase:</p>
+                    <div className="bg-gray-700 rounded-lg overflow-hidden">
+                      <div className="p-4 border-b border-gray-600">
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-400">Property:</span>
+                          <span className="text-white font-bold">{purchaseData.productName}</span>
+                        </div>
+                      </div>
+                      <div className="p-4 border-b border-gray-600">
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-400">Price:</span>
+                          <span className="text-orange-500 font-bold">{new Intl.NumberFormat("de-DE").format(purchaseData.price)}€</span>
+                        </div>
+                      </div>
+                      <div className="p-4">
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-400">Seller:</span>
+                          <span className="text-white">{purchaseData.seller}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex gap-3">
+                    <button 
+                      onClick={() => setShowPurchasePopup(false)}
+                      className="flex-1 py-3 px-4 rounded-lg bg-gray-700 hover:bg-gray-600 text-white font-medium transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => setApprovalStep("approving")}
+                      className="flex-1 py-3 px-4 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-medium transition-colors flex items-center justify-center"
+                    >
+                      Confirm Purchase
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 ml-2" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    </button>
+                  </div>
+                </>
+              ) : approvalStep === "approving" ? (
+                <div className="text-center py-6">
+                  <div className="w-20 h-20 mx-auto mb-6 relative">
+                    <div className="absolute inset-0 rounded-full border-4 border-orange-500 border-t-transparent animate-spin"></div>
+                    <div className="absolute inset-3 rounded-full bg-gray-700 flex items-center justify-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-orange-500" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                  </div>
+                  <h3 className="text-white text-xl font-bold mb-2">Processing Payment</h3>
+                  <p className="text-gray-400">Please wait while we process your transaction...</p>
+                </div>
+              ) : (
+                <div className="text-center py-6">
+                  <div className="w-20 h-20 mx-auto mb-6 bg-green-500 rounded-full flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-white" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <h3 className="text-white text-xl font-bold mb-2">Payment Approved!</h3>
+                  <p className="text-gray-400 mb-4">We're finalizing your purchase now...</p>
+                  <div className="w-16 h-1 mx-auto bg-gray-700 rounded-full overflow-hidden">
+                    <div className="h-full bg-orange-500 animate-pulse"></div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -268,7 +363,7 @@ const styles = StyleSheet.create({
   }
 });
 
-const ReceiptPDF = ({ receipt }) => (
+const ReceiptPDF = ({ purchaseData }) => (
   <Document>
     <Page size="A4" style={styles.page}>
       {/* Header with Logo */}
@@ -278,9 +373,9 @@ const ReceiptPDF = ({ receipt }) => (
           style={styles.logo}
         />
         <View style={styles.headerRight}>
-          <Text style={{ fontSize: 10, color: '#64748b' }}>Receipt #{receipt.$id}</Text>
+          <Text style={{ fontSize: 10, color: '#64748b' }}>Receipt #{purchaseData.$id}</Text>
           <Text style={{ fontSize: 10, color: '#64748b' }}>
-            {new Date(receipt.$createdAt).toLocaleDateString()}
+            {new Date(purchaseData.$createdAt).toLocaleDateString()}
           </Text>
         </View>
       </View>
@@ -292,23 +387,23 @@ const ReceiptPDF = ({ receipt }) => (
       <View style={styles.section}>
         <View style={styles.row}>
           <Text style={styles.label}>Shop Name</Text>
-          <Text style={styles.value}>{receipt.shopname}</Text>
+          <Text style={styles.value}>{purchaseData.shopname}</Text>
         </View>
         <View style={styles.row}>
           <Text style={styles.label}>Product</Text>
-          <Text style={styles.value}>{receipt.productName}</Text>
+          <Text style={styles.value}>{purchaseData.productName}</Text>
         </View>
         <View style={styles.row}>
           <Text style={styles.label}>Seller</Text>
-          <Text style={styles.value}>{receipt.seller}</Text>
+          <Text style={styles.value}>{purchaseData.seller}</Text>
         </View>
         <View style={styles.row}>
           <Text style={styles.label}>Buyer</Text>
-          <Text style={styles.value}>{receipt.buyer}</Text>
+          <Text style={styles.value}>{purchaseData.buyer}</Text>
         </View>
         <View style={styles.row}>
           <Text style={styles.label}>Price</Text>
-          <Text style={styles.value}>{receipt.price}€</Text>
+          <Text style={styles.value}>{purchaseData.price}€</Text>
         </View>
       </View>
 
@@ -318,7 +413,7 @@ const ReceiptPDF = ({ receipt }) => (
       {/* Validation Code */}
       <View style={styles.validationCode}>
         <Text style={{ fontSize: 10, color: '#64748b' }}>Validation Code</Text>
-        <Text style={{ fontSize: 12, marginTop: 5 }}>{receipt.$id}</Text>
+        <Text style={{ fontSize: 12, marginTop: 5 }}>{purchaseData.$id}</Text>
       </View>
 
       {/* Footer */}
